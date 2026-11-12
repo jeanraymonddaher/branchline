@@ -464,3 +464,9 @@ html[data-theme=light] .band { opacity: .16; }
 .imgpick { padding: 0; border: 2px solid transparent; border-radius: 50%; background: none; overflow: hidden; aspect-ratio: 1; }
 .imgpick img { width: 100%; height: 100%; display: block; border-radius: 50%; }
 .imgpick:hover { border-color: var(--accent); }
+/* tabs size to their name, and shrink together only when the bar is full */
+.tab { flex: 0 1 auto; min-width: 64px; max-width: 320px; padding: 0 8px 0 14px; }
+.tab .tname { min-width: 0; }
+.tab .tclose { display: inline-flex; visibility: hidden; margin-left: 2px; }
+.tab.active .tclose, .tab:hover .tclose { visibility: visible; }
+.tab.add { flex: none; min-width: 0; padding: 0 14px; }
