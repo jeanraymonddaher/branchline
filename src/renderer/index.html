@@ -1,0 +1,45 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: https://www.gravatar.com https://avatars.githubusercontent.com https://github.com; style-src 'self' 'unsafe-inline'">
+<title>Branchline</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div id="titlebar">
+  <div id="tabs"></div>
+  <div class="drag-fill"></div>
+  <div id="tb-right"></div>
+</div>
+<div id="toolbar"></div>
+<div id="main">
+  <aside id="left">
+    <div id="viewing"></div>
+    <div id="filterbox"><input id="filter" placeholder="Filter (⌘ + Option + f)" spellcheck="false"><span id="filter-ico"></span></div>
+    <div id="refs"></div>
+  </aside>
+  <section id="center">
+    <div id="graph">
+      <div id="ghead">
+        <div class="gh ghref">BRANCH / TAG<span class="resizer" data-col="refW"></span></div>
+        <div class="gh ghgraph">GRAPH<span class="resizer" data-col="graphW"></span></div>
+        <div class="gh ghmsg">COMMIT MESSAGE</div>
+        <div class="gh ghauthor">AUTHOR</div>
+        <div class="gh ghdate">DATE / TIME</div>
+        <div class="gh ghsha">SHA</div>
+        <button id="gcols" class="iconbtn" title="Columns"></button>
+      </div>
+      <div id="gsearch" hidden><input id="gsearch-in" placeholder="Search commits by message, author or SHA" spellcheck="false"><span id="gsearch-n"></span><button id="gsearch-x" class="iconbtn"></button></div>
+      <div id="gscroll" tabindex="0"><div id="gspacer"></div></div>
+    </div>
+    <div id="diff" hidden></div>
+    <div id="welcome" hidden></div>
+  </section>
+  <aside id="right"></aside>
+</div>
+<div id="statusbar"></div>
+<div id="toasts"></div>
+<script type="module" src="app.js"></script>
+</body>
+</html>

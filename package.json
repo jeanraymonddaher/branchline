@@ -1,0 +1,50 @@
+{
+  "name": "branchline",
+  "productName": "Branchline",
+  "version": "1.0.0",
+  "description": "A fast Git client with a visual commit graph and profile switching",
+  "main": "src/main.js",
+  "author": "Branchline",
+  "license": "UNLICENSED",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "icon": "electron scripts/make-icon.js",
+    "dist": "electron-builder --mac",
+    "release": "bash scripts/release.sh"
+  },
+  "build": {
+    "appId": "dev.branchline.app",
+    "productName": "Branchline",
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "universal"
+          ]
+        }
+      ],
+      "category": "public.app-category.developer-tools",
+      "identity": "-",
+      "icon": "build/icon.png",
+      "hardenedRuntime": false
+    },
+    "dmg": {
+      "title": "Branchline"
+    }
+  },
+  "devDependencies": {
+    "@fontsource/open-sans": "^5.3.0",
+    "electron": "^45.3.0",
+    "electron-builder": "^26.18.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jeanraymonddaher/branchline.git"
+  }
+}
