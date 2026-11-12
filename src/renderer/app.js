@@ -2138,7 +2138,7 @@ function renderWip(r, box) {
       'div',
       { class: 'cbox' },
       h('div', { class: 'ctab' }, icon('commit', 15), 'Commit'),
-      h(
+      h('div', { class: 'amendrow' }, h(
         'label',
         { class: 'amend' },
         h('input', {
@@ -2153,6 +2153,19 @@ function renderWip(r, box) {
           },
         }),
         'Amend previous commit'
+      ),
+        h('button', {
+          class: 'mini clearmsg',
+          title: 'Clear the commit summary and description',
+          onclick: () => {
+            m.summary = m.desc = '';
+            $('csum').value = $('cdesc').value = '';
+            left.textContent = '72';
+            left.className = 'left';
+            setBtn();
+            $('csum').focus();
+          },
+        }, icon('close', 11), 'Clear')
       ),
       h(
         'div',
