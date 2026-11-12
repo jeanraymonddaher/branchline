@@ -168,6 +168,7 @@ async function checkForUpdates(manual) {
     if (manual) dialog.showMessageBox(win, { message: 'Branchline is up to date', detail: `Version ${app.getVersion()} is the latest.` });
     return;
   }
+  if (win && !win.isDestroyed()) win.webContents.send('update-available', latest);
   const { response } = await dialog.showMessageBox(win, {
     message: `Branchline ${latest} is available`,
     detail: `You have ${app.getVersion()}. Updating downloads the new version and restarts the app.`,
@@ -210,6 +211,8 @@ open "$2"
   spawn('/bin/bash', [script, path.join(dir, dmg), target], { detached: true, stdio: 'ignore' }).unref();
   app.quit();
 }
+
+ipcMain.handle('update:check', () => checkForUpdates(true));
 
 function send(cmd) {
   if (win && !win.isDestroyed()) win.webContents.send('menu', cmd);

@@ -56,6 +56,7 @@ const ICONS = {
   warn: P('M8 2l6.5 11.5h-13zM8 6.5v3.5M8 12h.01'),
   user: C(8, 5.5, 2.5) + P('M3 13.5c.5-3 2.5-4 5-4s4.5 1 5 4'),
   arrowRight: P('M3 8h10M9.5 4.5L13 8l-3.5 3.5'),
+  update: C(8, 8, 6) + P('M8 11.2V5.2M5.4 7.7L8 5.1l2.6 2.6'),
 };
 
 export function icon(name, size = 16, cls = '') {
@@ -159,6 +160,39 @@ export function form({ title, message, detail, fields = [], ok = 'OK', danger = 
         inputs[f.name] = input;
         return h('label', { class: 'frow check' }, input, h('span', {}, f.label));
       }
+      if (f.type === 'image') {
+        // A small square picture, stored as a data URL.
+        let val = f.value || '';
+        const prev = h('span', { class: 'imgprev' });
+        const file = h('input', { type: 'file', accept: 'image/*', style: { display: 'none' } });
+        const clear = h('button', { class: 'btn', type: 'button', onclick: (e) => (e.preventDefault(), (val = ''), draw()) }, 'Remove');
+        const draw = () => {
+          put(prev, val ? h('img', { src: val }) : null);
+          clear.hidden = !val;
+        };
+        file.addEventListener('change', () => {
+          const fl = file.files[0];
+          if (!fl) return;
+          const rd = new FileReader();
+          rd.onload = () => {
+            const img = new Image();
+            img.onload = () => {
+              const c = document.createElement('canvas');
+              c.width = c.height = 96;
+              const side = Math.min(img.width, img.height);
+              c.getContext('2d').drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, 96, 96);
+              val = c.toDataURL('image/png');
+              draw();
+            };
+            img.src = rd.result;
+          };
+          rd.readAsDataURL(fl);
+          file.value = '';
+        });
+        draw();
+        inputs[f.name] = { get value() { return val; }, focus() {} };
+        return h('div', { class: 'frow' }, h('span', { class: 'flabel' }, f.label), h('div', { class: 'imgrow' }, prev, h('button', { class: 'btn', type: 'button', onclick: (e) => (e.preventDefault(), file.click()) }, 'Choose image…'), clear, file));
+      }
       if (f.type === 'select') {
         input = h(
           'select',
@@ -216,7 +250,7 @@ export function form({ title, message, detail, fields = [], ok = 'OK', danger = 
     );
     document.body.append(back);
     addEventListener('keydown', onKey, true);
-    const first = fields.find((f) => f.type !== 'checkbox' && f.type !== 'select');
+    const first = fields.find((f) => f.type !== 'checkbox' && f.type !== 'select' && f.type !== 'image');
     if (first) {
       inputs[first.name].focus();
       inputs[first.name].select?.();

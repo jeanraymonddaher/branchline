@@ -18,7 +18,8 @@ let S = {
   recent: [],
   cloneDir: null,
   avatarMap: {},
-  settings: { avatars: true, limit: 2000, pullMode: 'ff', fileView: 'path', refW: 150, graphW: null, compact: false, smart: false, cols: { ref: true, graph: true, msg: true, author: false, date: false, sha: false } },
+  autoPull: {},
+  settings: { avatars: true, limit: 2000, pullMode: 'ff', fileView: 'path', theme: 'dark', textSize: -1, refW: 150, graphW: null, compact: false, smart: false, cols: { ref: true, graph: true, msg: true, author: false, date: false, sha: false } },
 };
 const repos = new Map();
 const save = debounce(() => api.storeSave(S), 250);
@@ -425,6 +426,15 @@ async function doCommit() {
 }
 
 // ------------------------------------------------------------ tabs
+// The same folder can be spelled several ways (trailing slash, letter case on macOS, accents).
+const pathKey = (p) => String(p || '').normalize('NFC').replace(/\/+$/, '').toLowerCase();
+const tabIndex = (p) => S.tabs.findIndex((t) => pathKey(t.path) === pathKey(p));
+function dedupeTabs() {
+  const activePath = S.tabs[S.active] && S.tabs[S.active].path;
+  const seen = new Set();
+  S.tabs = S.tabs.filter((t) => !seen.has(pathKey(t.path)) && seen.add(pathKey(t.path)));
+  S.active = Math.max(0, tabIndex(activePath));
+}
 async function openRepo(path, { quiet = false } = {}) {
   const res = await G.git(path, ['rev-parse', '--show-toplevel']);
   if (res.code !== 0) {
@@ -432,12 +442,12 @@ async function openRepo(path, { quiet = false } = {}) {
     return false;
   }
   const top = res.stdout.trim();
-  let i = S.tabs.findIndex((t) => t.path === top);
+  let i = tabIndex(top);
   if (i < 0) {
     S.tabs.push({ path: top, name: base(top) });
     i = S.tabs.length - 1;
   }
-  S.recent = [top, ...S.recent.filter((p) => p !== top)].slice(0, 12);
+  S.recent = [top, ...S.recent.filter((p) => pathKey(p) !== pathKey(top))].slice(0, 12);
   activate(i);
   return true;
 }
@@ -482,12 +492,12 @@ async function openMany(paths) {
     const res = await G.git(p, ['rev-parse', '--show-toplevel']);
     if (res.code !== 0) continue;
     const top = res.stdout.trim();
-    let i = S.tabs.findIndex((t) => t.path === top);
+    let i = tabIndex(top);
     if (i < 0) {
       S.tabs.push({ path: top, name: base(top) });
       i = S.tabs.length - 1;
     }
-    S.recent = [top, ...S.recent.filter((x) => x !== top)].slice(0, 12);
+    S.recent = [top, ...S.recent.filter((x) => pathKey(x) !== pathKey(top))].slice(0, 12);
     if (first < 0) first = i;
   }
   if (first >= 0) activate(first);
@@ -597,9 +607,9 @@ function wireDrops() {
 const addMenu = () => [
   { label: 'Open repositories…', icon: 'folder', hint: '⌘O', action: pickRepo },
   { label: 'Clone from GitHub…', icon: 'cloud', hint: '⇧⌘O', action: cloneDialog },
-  ...(S.recent.filter((p) => !S.tabs.some((t) => t.path === p)).length ? ['-', { header: 'Recent' }] : []),
+  ...(S.recent.filter((p) => tabIndex(p) < 0).length ? ['-', { header: 'Recent' }] : []),
   ...S.recent
-    .filter((p) => !S.tabs.some((t) => t.path === p))
+    .filter((p) => tabIndex(p) < 0)
     .slice(0, 8)
     .map((p) => ({ label: base(p), hint: p.replace(INFO.home, '~'), action: () => openRepo(p) })),
 ];
@@ -634,12 +644,35 @@ async function switchProfile(p) {
   const a = await G.git(null, ['config', '--global', 'user.name', p.name]);
   const b = await G.git(null, ['config', '--global', 'user.email', p.email]);
   if (a.code || b.code) return gitError('Could not switch profile', a.code ? a : b);
+  // Each profile keeps its own set of open repositories.
+  const cur = activeProfile();
+  const changing = cur && cur.id !== p.id;
+  if (changing) {
+    cur.tabs = S.tabs.map((t) => ({ ...t }));
+    cur.active = S.active;
+  }
   S.profileId = p.id;
+  if (p.avatar) G.setAvatar(p.email, p.avatar);
+  toast(`Profile: ${p.label} — commits are now authored as ${p.name} <${p.email}>`);
+  if (changing && Array.isArray(p.tabs)) {
+    for (const t of S.tabs) {
+      if (p.tabs.some((x) => pathKey(x.path) === pathKey(t.path))) continue;
+      api.unwatch(t.path);
+      repos.delete(t.path);
+    }
+    S.tabs = p.tabs.map((t) => ({ ...t }));
+    dedupeTabs();
+    return activate(Math.max(0, Math.min(p.active || 0, S.tabs.length - 1)));
+  }
   save();
   renderTitleRight();
-  toast(`Profile: ${p.label} — commits are now authored as ${p.name} <${p.email}>`);
   const r = R();
   if (r) refresh(r.path);
+}
+function profileAvatar(p, size) {
+  const el = h('span', { class: 'pavatar', style: { background: colorFor(p.email), ...(size ? { width: size + 'px', height: size + 'px' } : {}) } }, initials(p.label));
+  if (p.avatar) el.append(h('img', { src: p.avatar, draggable: 'false' }));
+  return el;
 }
 async function editProfile(p) {
   const v = await form({
@@ -649,13 +682,22 @@ async function editProfile(p) {
       { name: 'label', label: 'Profile name', value: p?.label, required: true, placeholder: 'Work' },
       { name: 'name', label: 'Git author name', value: p?.name, required: true, placeholder: 'Jane Doe' },
       { name: 'email', label: 'Git author email', value: p?.email, required: true, placeholder: 'jane@example.com' },
+      { name: 'avatar', type: 'image', label: 'Avatar', value: p?.avatar || '' },
     ],
     ok: p ? 'Save' : 'Create Profile',
   });
   if (!v) return;
   if (p) {
     Object.assign(p, v);
-    if (p.id === S.profileId) return switchProfile(p);
+    if (p.id === S.profileId) {
+      await switchProfile(p);
+      const r = R();
+      if (r) {
+        r.version++;
+        refresh(r.path);
+      }
+      return renderTitleRight();
+    }
   } else {
     p = { id: 'p' + Date.now(), ...v };
     S.profiles.push(p);
@@ -676,7 +718,7 @@ function profileMenu(anchor) {
     anchor,
     [
       { header: 'Profiles' },
-      ...S.profiles.map((p) => ({ label: p.label, hint: p.email, check: p === cur, action: () => p !== cur && switchProfile(p) })),
+      ...S.profiles.map((p) => ({ label: [profileAvatar(p, 18), p.label], hint: p.email, check: p === cur, action: () => p !== cur && switchProfile(p) })),
       '-',
       { label: 'New profile…', icon: 'plus', action: () => editProfile(null) },
       { label: `Edit ${cur.label}…`, icon: 'pencil', action: () => editProfile(cur) },
@@ -685,14 +727,21 @@ function profileMenu(anchor) {
     { right: true, minWidth: 280 }
   );
 }
+let updateAvailable = null;
 function renderTitleRight() {
   const p = activeProfile();
   put($('tb-right'), 
+    h(
+      'button',
+      { class: 'iconbtn' + (updateAvailable ? ' has-update' : ''), title: updateAvailable ? `Update to Branchline ${updateAvailable}` : 'Check for updates', onclick: () => api.checkUpdates() },
+      icon('update', 17),
+      updateAvailable ? h('span', { class: 'updot' }) : null
+    ),
     h('button', { class: 'iconbtn', title: 'Preferences', onclick: settingsDialog }, icon('gear', 17)),
     h(
       'button',
       { class: 'iconbtn', id: 'profile-btn', title: `${p.name} <${p.email}>`, onclick: (e) => profileMenu(e.currentTarget) },
-      h('span', { class: 'pavatar', style: { background: colorFor(p.email) } }, initials(p.label)),
+      profileAvatar(p),
       h('span', {}, p.label),
       icon('chevDown', 10)
     )
@@ -703,6 +752,8 @@ async function settingsDialog() {
   const v = await form({
     title: 'Preferences',
     fields: [
+      { name: 'theme', type: 'select', label: 'Theme', value: s.theme, options: Object.entries(THEMES).map(([value, label]) => ({ value, label })) },
+      { name: 'textSize', type: 'select', label: 'Text size', value: String(s.textSize), options: ['-2', '-1', '0', '1'].map((value) => ({ value, label: TEXT_SIZES[value] })) },
       { name: 'avatars', type: 'checkbox', label: 'Show author avatars (loads from Gravatar and GitHub)', value: s.avatars },
       { name: 'limit', type: 'number', label: 'Commits to load at a time', value: s.limit },
       { name: 'pullMode', type: 'select', label: 'Default pull action', value: s.pullMode, options: Object.entries(PULL).map(([value, p]) => ({ value, label: p.label })) },
@@ -713,6 +764,9 @@ async function settingsDialog() {
   s.avatars = v.avatars;
   s.limit = Math.max(200, Math.min(20000, +v.limit || 2000));
   s.pullMode = v.pullMode;
+  s.theme = v.theme;
+  s.textSize = +v.textSize;
+  applyAppearance();
   save();
   for (const r of repos.values()) {
     r.limit = s.limit;
@@ -837,6 +891,7 @@ function renderToolbar() {
             ...S.tabs.map((t, i) => ({ label: t.name, check: i === S.active, action: () => activate(i) })),
             '-',
             { label: 'Reveal in Finder', icon: 'folder', action: () => api.reveal(r.path) },
+            { label: 'Auto-pull…', icon: 'pull', hint: autoCfg(r.path)?.on ? `every ${autoCfg(r.path).minutes} min` : 'off', action: () => autoPullDialog(r) },
             ...addMenu(),
           ]),
       },
@@ -861,8 +916,7 @@ function renderToolbar() {
     h(
       'div',
       { class: 'tcenter' },
-      tbtn('undo', r.undo.length ? 'Undo ' + r.undo[r.undo.length - 1].label : 'Undo', undo, !r.undo.length),
-      tbtn('redo', r.redo.length ? 'Redo ' + r.redo[r.redo.length - 1].label : 'Redo', redo, !r.redo.length),
+      tbtn('refresh', 'Fetch all', fetchAll),
       h(
         'div',
         { class: 'grp' },
@@ -895,7 +949,7 @@ function renderToolbar() {
       tbtn('stash', dirtyCount(d) ? 'Stash' : 'Nothing to stash', stash, !dirtyCount(d)),
       tbtn('pop', 'Pop stash', pop, !d.stashes.length)
     ),
-    h('div', { class: 'tright' }, tbtn('refresh', 'Fetch all', fetchAll), tbtn('search', 'Search commits (⌘F)', () => toggleSearch(true)))
+    h('div', { class: 'tright' }, tbtn('search', 'Search commits (⌘F)', () => toggleSearch(true)))
   );
 }
 
@@ -2001,10 +2055,108 @@ function renderWelcome() {
       : null
   );
 }
+// ---- auto-pull: per repository, fetch on a timer and fast-forward the chosen branches.
+const autoState = new Map();
+const autoCfg = (path) => (S.autoPull || {})[path];
+function defaultMainBranch(r) {
+  const names = ((r && r.data && r.data.refs.locals) || []).map((b) => b.name);
+  return ['main', 'master', 'develop', 'trunk'].find((n) => names.includes(n)) || 'main';
+}
+async function autoPullDialog(r) {
+  const cfg = autoCfg(r.path) || {};
+  const v = await form({
+    title: `Auto-pull — ${base(r.path)}`,
+    message: 'Fetches on a timer and fast-forwards the branches below, whether or not they are checked out. A branch that has diverged, or whose update would touch your uncommitted changes, is left alone.',
+    fields: [
+      { name: 'on', type: 'checkbox', label: 'Auto-pull this repository', value: cfg.on ?? true },
+      { name: 'branches', label: 'Branches (comma separated)', value: cfg.branches || defaultMainBranch(r), required: true },
+      { name: 'minutes', type: 'number', label: 'Every (minutes)', value: cfg.minutes || 5 },
+    ],
+    ok: 'Save',
+  });
+  if (!v) return;
+  S.autoPull = { ...(S.autoPull || {}), [r.path]: { on: v.on, branches: v.branches, minutes: Math.max(1, Math.min(1440, Math.round(+v.minutes) || 5)) } };
+  save();
+  autoState.delete(r.path);
+  renderStatus();
+  if (v.on) autoPullRun(r.path);
+}
+async function autoPullRun(path) {
+  const cfg = autoCfg(path);
+  if (!cfg || !cfg.on) return;
+  const st = autoState.get(path) || {};
+  autoState.set(path, st);
+  const r = repos.get(path);
+  if (st.running || (r && (r.busy || (r.data && r.data.op)))) return; // mid-operation: try again on the next tick
+  st.running = true;
+  const updated = [];
+  const skipped = [];
+  try {
+    const f = await G.git(path, ['fetch', '--all', '--prune']);
+    if (f.code !== 0) skipped.push('fetch failed');
+    else {
+      const cur = (await G.git(path, ['symbolic-ref', '--short', '-q', 'HEAD'])).stdout.trim();
+      for (const b of cfg.branches.split(',').map((x) => x.trim()).filter(Boolean)) {
+        const up = await G.git(path, ['rev-parse', '--symbolic-full-name', b + '@{upstream}']);
+        if (up.code !== 0 || !up.stdout.trim()) {
+          skipped.push(`${b}: no upstream`);
+          continue;
+        }
+        const u = up.stdout.trim();
+        const [before, target] = await Promise.all([G.git(path, ['rev-parse', 'refs/heads/' + b]), G.git(path, ['rev-parse', u])]);
+        if (before.stdout.trim() === target.stdout.trim()) continue;
+        const res = b === cur ? await G.git(path, ['merge', '--ff-only', u]) : await G.git(path, ['fetch', '.', `${u}:refs/heads/${b}`]);
+        if (res.code === 0) updated.push(b);
+        else skipped.push(`${b}: not a fast-forward`);
+      }
+    }
+  } finally {
+    st.running = false;
+    st.last = Date.now();
+    st.note = updated.length ? `${updated.join(', ')} updated` : skipped.length ? skipped.join('; ') : 'up to date';
+    st.problem = !updated.length && skipped.length > 0;
+  }
+  if (updated.length) {
+    toast(`Auto-pull: ${base(path)} — ${updated.join(', ')} updated`);
+    if (r) refresh(path);
+  }
+  if (R() && R().path === path) renderStatus();
+}
+function autoPullTick() {
+  for (const t of S.tabs) {
+    const cfg = autoCfg(t.path);
+    if (!cfg || !cfg.on) continue;
+    const st = autoState.get(t.path);
+    if (!st || !st.last || Date.now() - st.last >= cfg.minutes * 60000) autoPullRun(t.path);
+  }
+}
+function autoPullChip(r) {
+  const cfg = autoCfg(r.path);
+  const st = autoState.get(r.path);
+  const on = cfg && cfg.on;
+  const when = st && st.last ? new Date(st.last).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : null;
+  return h(
+    'span',
+    { class: 'auto' + (on ? ' on' : ''), title: on ? `Auto-pull ${cfg.branches} every ${cfg.minutes} min` + (st && st.note ? ` — last: ${st.note}` : '') + '. Click to change.' : 'Set up auto-pull for this repository', onclick: () => autoPullDialog(r) },
+    icon('pull', 11),
+    on ? `Auto-pull ${cfg.branches} · every ${cfg.minutes} min` + (when ? ` · ${when}` + (st.problem ? ` (${st.note})` : '') : '') : 'Auto-pull off'
+  );
+}
+
+// ---- appearance
+const THEMES = { dark: 'Dark', midnight: 'Midnight', ocean: 'Ocean', light: 'Light' };
+const TEXT_SIZES = { '-2': 'Smaller', '-1': 'Default', 0: 'Large', 1: 'Larger' };
+function applyAppearance() {
+  const s = S.settings;
+  document.documentElement.dataset.theme = THEMES[s.theme] ? s.theme : 'dark';
+  document.documentElement.style.setProperty('--fz', (Number.isFinite(+s.textSize) ? +s.textSize : -1) + 'px');
+}
+
 function renderStatus() {
   const r = R();
   const id = r?.data?.ident;
   put($('statusbar'), 
+    r && r.data ? autoPullChip(r) : null,
     id ? h('span', { title: 'Commits in this repository are authored as' }, `${id.name} <${id.email}>`) : null,
     h('span', { class: 'ver' }, INFO.version)
   );
@@ -2119,14 +2271,22 @@ async function init() {
   setCompact(S.settings.compact);
   wire();
   await initProfiles();
+  for (const p of S.profiles) if (p.avatar) G.setAvatar(p.email, p.avatar);
   // Drop tabs whose folders no longer exist.
   const ok = await Promise.all(S.tabs.map((t) => G.git(t.path, ['rev-parse', '--git-dir']).then((x) => x.code === 0)));
   S.tabs = S.tabs.filter((t, i) => ok[i]);
   S.active = Math.max(0, Math.min(S.active, S.tabs.length - 1));
+  dedupeTabs();
+  applyAppearance();
+  setInterval(autoPullTick, 20000);
+  api.onUpdateAvailable((v) => {
+    updateAvailable = v;
+    renderTitleRight();
+  });
   if (INFO.devOpen) {
     for (const p of INFO.devOpen.split(':')) await openRepo(p, { quiet: true });
   } else activate(S.active);
  wireDrops();
-  window.__app = { moveTab, openMany, columnsMenu, applyGraphSettings, S: () => S, R, repos, openRepo, selectSha, openDiff, refresh, squash, squashable, headChain, cloneDialog, profileMenu, commitMenu, activate, checkout, cherryPick, resetTo, stash, pop, mergeInto, rebaseOnto, undo, redo, stage, unstage, stageAll, doCommit, switchProfile, applyHunk, push, pull, createBranch, G };
+  window.__app = { autoPullRun, autoPullDialog, autoState, applyAppearance, editProfile, moveTab, openMany, columnsMenu, applyGraphSettings, S: () => S, R, repos, openRepo, selectSha, openDiff, refresh, squash, squashable, headChain, cloneDialog, profileMenu, commitMenu, activate, checkout, cherryPick, resetTo, stash, pop, mergeInto, rebaseOnto, undo, redo, stage, unstage, stageAll, doCommit, switchProfile, applyHunk, push, pull, createBranch, G };
 }
 init();

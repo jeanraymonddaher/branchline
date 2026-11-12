@@ -18,6 +18,8 @@ contextBridge.exposeInMainWorld('api', {
   reveal: call('reveal'),
   copy: call('copy'),
   info: call('info'),
+  checkUpdates: call('update:check'),
+  onUpdateAvailable: (fn) => ipcRenderer.on('update-available', (e, v) => fn(v)),
   pathFor: (file) => webUtils.getPathForFile(file),
   onRepoChanged: (fn) => ipcRenderer.on('repo-changed', (e, p) => fn(p)),
   onMenu: (fn) => ipcRenderer.on('menu', (e, cmd) => fn(cmd)),
