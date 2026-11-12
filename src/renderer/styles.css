@@ -556,3 +556,31 @@ body.resizing * { user-select: none !important; }
 .sl .tx.del { background: var(--delbg); color: var(--deltx); } .sl .ln.del { background: var(--delbg); }
 .sl .tx.add { background: var(--addbg); color: var(--addtx); } .sl .ln.add { background: var(--addbg); }
 .sl .nil { background: var(--lnbg); }
+
+/* ---- graph finish, closer to GitKraken ---- */
+/* selection: the message cell takes the lane colour; the label column is left alone */
+.row:hover .mcell { background: color-mix(in srgb, var(--lane) 13%, transparent); }
+.row:hover .refcell { background: none; }
+.row.sel .mcell, .row.sel:hover .mcell { background: color-mix(in srgb, var(--lane) 52%, var(--bg0)); }
+.row.sel .refcell { background: none; }
+.row.sel .subj { color: var(--sidecur); }
+.row.sel .body { color: color-mix(in srgb, var(--sidecur) 72%, transparent); }
+.row.sel .acell, .row.sel .dcell, .row.sel .scell { background: color-mix(in srgb, var(--lane) 52%, var(--bg0)); color: var(--sidecur); }
+.band { opacity: .15; }
+.row.sel .band { opacity: .52; }
+.row.wip .band { opacity: .3; }
+.row.wip .mcell { background: color-mix(in srgb, var(--lane) 10%, transparent); }
+/* labels: more muted fill, crisp edge */
+.lbl { background: color-mix(in srgb, var(--lane) 34%, var(--bg0)); border-radius: 3px; }
+.lbl.head { background: color-mix(in srgb, var(--lane) 58%, var(--bg0)); }
+.more { background: color-mix(in srgb, var(--lane) 30%, var(--bg0)); border-radius: 3px; padding: 3px 5px; }
+.rline, .gline { opacity: .55; }
+.row.headrow .rline, .row.headrow .gline { opacity: 1; }
+/* a hairline across the graph where the day changes, with the chip sitting on it */
+.row.dayrow::before { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 1px; background: var(--line2); opacity: .55; z-index: 3; pointer-events: none; }
+.datechip { top: -8px; right: 6px; font-size: calc(10.5px + var(--fz)); background: var(--bg2); color: var(--dim); border: 1px solid var(--line2); padding: 0 6px; line-height: 14px; }
+/* column header: separators and a touch more contrast */
+#ghead { border-bottom: 1px solid var(--line); color: var(--text); }
+#ghead .gh + .gh { border-left: 1px solid var(--line2); }
+.node { box-shadow: 0 0 0 1px var(--bg0); }
+html[data-theme=light] .row.sel .mcell, html[data-theme=light] .row.sel:hover .mcell, html[data-theme=light] .row.sel .acell, html[data-theme=light] .row.sel .dcell, html[data-theme=light] .row.sel .scell { background: color-mix(in srgb, var(--lane) 30%, var(--bg0)); }

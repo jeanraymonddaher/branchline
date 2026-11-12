@@ -1570,7 +1570,7 @@ function buildRow(r, i) {
       h('span', { class: 'subj' }, c.subject),
       c.body ? h('span', { class: 'body' }, c.body.slice(0, 400).split(/\n+/).join(' | ')) : null
     );
-    if (showDate) el.append(h('span', { class: 'datechip' }, label));
+    if (showDate) (el.classList.add('dayrow'), el.append(h('span', { class: 'datechip' }, label)));
   }
   const plain = !c.wip && !c.stash;
   el.append(
