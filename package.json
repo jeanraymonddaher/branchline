@@ -1,7 +1,7 @@
 {
   "name": "branchline",
   "productName": "Branchline",
-  "version": "1.0.12",
+  "version": "1.0.13",
   "description": "A fast Git client with a visual commit graph and profile switching",
   "main": "src/main.js",
   "author": "Branchline",
