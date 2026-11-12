@@ -4,8 +4,8 @@ const fs = require('fs');
 const path = require('path');
 const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
 <defs>
-<linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#22d3c5"/><stop offset="0.5" stop-color="#2f6bff"/><stop offset="1" stop-color="#8b2be2"/></linearGradient>
-<linearGradient id="s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity="0.22"/><stop offset="0.5" stop-color="#fff" stop-opacity="0"/></linearGradient>
+<linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1c1d21"/><stop offset="1" stop-color="#050506"/></linearGradient>
+<linearGradient id="s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity="0.07"/><stop offset="0.5" stop-color="#fff" stop-opacity="0"/></linearGradient>
 </defs>
 <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#g)"/>
 <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#s)"/>
@@ -15,7 +15,7 @@ const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" 
 <path d="M372 512H560a111 111 0 0 1 0 222H372"/>
 </g>
 <g fill="#fff"><circle cx="372" cy="290" r="62"/><circle cx="372" cy="512" r="62"/><circle cx="372" cy="734" r="62"/></g>
-<circle cx="372" cy="290" r="26" fill="#22b8c9"/><circle cx="372" cy="512" r="26" fill="#2f6bff"/><circle cx="372" cy="734" r="26" fill="#6a3fe8"/>
+<circle cx="372" cy="290" r="26" fill="#0a0a0b"/><circle cx="372" cy="512" r="26" fill="#0a0a0b"/><circle cx="372" cy="734" r="26" fill="#0a0a0b"/>
 </svg>`;
 app.whenReady().then(async () => {
   const win = new BrowserWindow({ width: 1024, height: 1024, show: false, transparent: true, frame: false, webPreferences: { offscreen: true } });
