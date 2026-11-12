@@ -517,3 +517,11 @@ body.resizing * { user-select: none !important; }
 .sec { font-size: calc(12.5px + var(--fz)); }
 .ritem .ab { font-size: calc(12px + var(--fz)); }
 #viewing { font-size: calc(13px + var(--fz)); }
+
+/* selected tab: lighter tab strip, and the active tab joins the toolbar below it */
+#titlebar { background: var(--bg3); }
+.tab { color: var(--tabtext); }
+.tab:hover { background: color-mix(in srgb, var(--bg3) 55%, var(--bg2)); }
+.tab.active { background: var(--bg2); color: var(--sidecur); margin-bottom: -1px; border-radius: 6px 6px 0 0; margin-top: 5px; }
+.tab.active:hover { background: var(--bg2); }
+#tb-right .iconbtn:hover:not(:disabled) { background: var(--bg2); }
