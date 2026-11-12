@@ -511,3 +511,9 @@ html[data-theme=light] #viewing .railexp, html[data-theme=light] #lrail .railexp
 #left.collapsed > #lgrip { display: none; }
 body.resizing { cursor: col-resize; }
 body.resizing * { user-select: none !important; }
+
+/* left panel text one step smaller */
+.ritem { font-size: calc(13px + var(--fz)); }
+.sec { font-size: calc(12.5px + var(--fz)); }
+.ritem .ab { font-size: calc(12px + var(--fz)); }
+#viewing { font-size: calc(13px + var(--fz)); }
