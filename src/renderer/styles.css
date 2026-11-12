@@ -649,3 +649,6 @@ html[data-theme=light] .row.sel .mcell, html[data-theme=light] .row.sel:hover .m
 .cdauthor .who .n { font-weight: 600; }
 .dhead { padding: 9px 12px; }
 html[data-theme=light] .commitbtn.ready { background: #2c8a2a; color: #fff; }
+/* short windows: each staging list keeps room for its header and two rows */
+.fsec { min-height: 104px; }
+.fsec.small { min-height: 0; }
