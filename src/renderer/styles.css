@@ -600,3 +600,30 @@ html[data-theme=light] .row.sel .mcell, html[data-theme=light] .row.sel:hover .m
 /* selected tab keeps the same height and position as the others */
 .tab.active { margin-top: 0; border-radius: 0; }
 .tab.active { padding-bottom: 1px; }
+
+/* ---- 20-minute finish pass: tabs and toolbar closer to GitKraken ---- */
+:root { --tabtext: #b3b7c0; }
+.tab { font-size: calc(15px + var(--fz)); font-weight: 600; gap: 8px; padding: 0 10px 0 16px; }
+.tab.active { font-weight: 700; }
+.tab .ico { color: var(--faint); }
+.tab.active > .ico:first-child { color: var(--dim); }
+.tab:not(.active):not(.add)::after { content: ''; position: absolute; right: 0; top: 11px; bottom: 11px; width: 1px; background: var(--line2); opacity: .7; }
+.tab .tclose svg { stroke-width: 2; }
+.crumb { font-size: calc(16px + var(--fz)); color: var(--bright); gap: 7px; }
+.crumb.repo { color: var(--sidecur); }
+.crumb .ico { color: var(--text); }
+.crumbsep { color: var(--faint); }
+.tcenter { gap: 16px; }
+.tcenter .iconbtn, .tright .iconbtn { color: var(--bright); }
+.tcenter .iconbtn:disabled, .tright .iconbtn:disabled { color: var(--faint); }
+.tcenter .iconbtn > .ico svg, .tright .iconbtn > .ico svg { width: 23px; height: 23px; stroke-width: 1.75; }
+.tcenter .grp .dd .ico svg { width: 12px; height: 12px; }
+#tb-right .iconbtn > .ico svg { stroke-width: 1.7; }
+#profile-btn { font-size: calc(14px + var(--fz)); color: var(--bright); }
+
+/* commit panel: roomier file rows, calmer message box */
+.file { height: 32px; font-size: calc(15px + var(--fz)); gap: 8px; }
+.fdirrow { height: 28px; font-size: calc(14px + var(--fz)); }
+.cdmsg { padding: 12px; }
+.cdmsg .b { line-height: 1.5; }
+.cdstats { padding: 12px 12px 4px; }

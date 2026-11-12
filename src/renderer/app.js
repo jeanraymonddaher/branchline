@@ -900,7 +900,7 @@ function renderTitleRight() {
       { class: 'iconbtn', id: 'profile-btn', title: `${p.name} <${p.email}>`, onclick: (e) => profileMenu(e.currentTarget) },
       profileAvatar(p),
       h('span', {}, p.label),
-      icon('chevDown', 10)
+      icon('caret', 12)
     )
   );
 }
@@ -1053,7 +1053,7 @@ function renderToolbar() {
           ]),
       },
       h('span', { class: 't' }, base(r.path)),
-      icon('chevDown', 10)
+      icon('caret', 12)
     ),
     h('span', { class: 'crumbsep' }, icon('chevRight', 14)),
     h(
@@ -1068,7 +1068,7 @@ function renderToolbar() {
           ),
       },
       h('span', { class: 't' }, headName),
-      icon('chevDown', 10)
+      icon('caret', 12)
     ),
     h(
       'div',
@@ -1098,7 +1098,7 @@ function renderToolbar() {
                 }))
               ),
           },
-          icon('chevDown', 10)
+          icon('caret', 12)
         )
       ),
       tbtn('push', 'Push', () => push()),
@@ -1396,7 +1396,12 @@ function refMenu(e, g) {
     items.push('-', { label: hid ? 'Show in graph' : 'Hide in graph', icon: hid ? 'eye' : 'eyeOff', action: () => setHidden(r, [full], !hid) });
   }
   if (hiddenOf(r.path).length) items.push({ label: 'Show everything hidden', icon: 'eye', action: () => ((S.hidden[r.path] = []), setHidden(r, [], false)) });
-  items.push('-', { label: 'Copy name', icon: 'copy', action: () => api.copy(target) });
+  const refSha = (g.local || g.remote || g.tag).sha;
+  items.push(
+    '-',
+    { label: g.tag ? 'Copy tag name' : 'Copy branch name', icon: 'copy', action: () => (api.copy(target), toast('Copied ' + target)) },
+    { label: 'Copy commit sha', icon: 'copy', action: () => (api.copy(refSha), toast('Copied ' + short(refSha))) }
+  );
   menu(e.clientX, e.clientY, items);
 }
 
@@ -1452,7 +1457,11 @@ function commitMenu(e, r, c) {
         if (v) op('Create tag ' + v.name, v.msg ? ['tag', '-a', v.name, '-m', v.msg, c.sha] : ['tag', v.name, c.sha]);
       },
     },
-    { label: 'Copy commit SHA', icon: 'copy', action: () => (api.copy(c.sha), toast('Copied ' + short(c.sha))) },
+    ...(R().refMap.get(c.sha) || [])
+      .filter((g) => g.local || g.remote)
+      .slice(0, 1)
+      .map((g) => ({ label: 'Copy branch name', icon: 'copy', hint: (g.local || g.remote).name, action: () => (api.copy((g.local || g.remote).name), toast('Copied ' + (g.local || g.remote).name)) })),
+    { label: 'Copy commit sha', icon: 'copy', action: () => (api.copy(c.sha), toast('Copied ' + short(c.sha))) },
     { label: 'Copy commit message', action: () => api.copy(c.subject + (c.body ? '\n\n' + c.body : '')) },
   ];
   menu(e.clientX, e.clientY, items);
@@ -2097,6 +2106,20 @@ function fmtDate(at) {
   const when = new Date(at * 1000);
   return when.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' }) + ' @ ' + when.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 }
+// Commit bodies are hard-wrapped at ~72 columns; join those lines so the panel can wrap them to its own width.
+// Lists, indented blocks and trailers (Co-authored-by: …) keep their line breaks.
+function reflow(body) {
+  const keep = (l) => /^(\s|[-*+•>#]|\d+[.)]\s|[A-Za-z-]+:\s)/.test(l) || l.length < 40;
+  return body
+    .split(/\n{2,}/)
+    .map((para) => {
+      const lines = para.split('\n');
+      let out = lines[0];
+      for (let i = 1; i < lines.length; i++) out += (keep(lines[i]) || lines[i - 1].length < 50 ? '\n' : ' ') + lines[i];
+      return out;
+    })
+    .join('\n\n');
+}
 function renderCommit(r, box, c, files) {
   if (!c) return put(box, );
   if (!files) {
@@ -2114,7 +2137,7 @@ function renderCommit(r, box, c, files) {
       c.stash ? 'stash: ' : 'commit: ',
       h('span', { class: 'sha', title: 'Click to copy the full SHA', onclick: () => (api.copy(c.sha), toast('Copied ' + short(c.sha))) }, short(c.sha))
     ),
-    h('div', { class: 'cdmsg' }, h('div', { class: 's' }, c.subject), c.body ? h('div', { class: 'b' }, c.body) : null),
+    h('div', { class: 'cdmsg' }, h('div', { class: 's' }, c.subject), c.body ? h('div', { class: 'b' }, reflow(c.body)) : null),
     c.stash ? null : h(
       'div',
       { class: 'cdauthor' },
