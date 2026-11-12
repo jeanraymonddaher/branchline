@@ -133,6 +133,7 @@ ipcMain.handle('trash', async (e, files) => {
   }
 });
 ipcMain.handle('terminal', (e, dir) => spawn('open', ['-a', 'Terminal', dir], { detached: true }).unref());
+ipcMain.handle('openUrl', (e, url) => /^https:\/\//.test(String(url)) && shell.openExternal(String(url)));
 ipcMain.handle('reveal', (e, file) => shell.showItemInFolder(file));
 ipcMain.handle('copy', (e, text) => clipboard.writeText(String(text)));
 ipcMain.handle('info', () => ({ version: app.getVersion(), home: os.homedir(), devOpen: DEV ? process.env.BL_OPEN || null : null }));

@@ -93,13 +93,13 @@ function parseLog(out) {
   return commits;
 }
 
-export async function loadRepo(path, limit, prev) {
+export async function loadRepo(path, limit, prev, hidden = []) {
   const fmt = '%(refname)%1f%(objectname)%1f%(*objectname)%1f%(upstream:short)%1f%(upstream:track)%1f%(HEAD)';
   const [refsOut, logOut, status, stashOut, remotesOut, ident, gitDir] = await Promise.all([
     gitOut(path, ['for-each-ref', '--format=' + fmt, 'refs/heads', 'refs/remotes', 'refs/tags'], NOLOCK),
     gitOut(
       path,
-      ['log', '--date-order', '--exclude=refs/stash', '--exclude=refs/notes/*', '--all', 'HEAD', '-n', String(limit), '--format=%x1e%H%x1f%P%x1f%an%x1f%ae%x1f%at%x1f%ct%x1f%cn%x1f%ce%x1f%s%x1f%b'],
+      ['log', '--date-order', '--exclude=refs/stash', '--exclude=refs/notes/*', ...hidden.map((x) => '--exclude=' + x), '--all', 'HEAD', '-n', String(limit), '--format=%x1e%H%x1f%P%x1f%an%x1f%ae%x1f%at%x1f%ct%x1f%cn%x1f%ce%x1f%s%x1f%b'],
       NOLOCK
     ),
     loadStatus(path),

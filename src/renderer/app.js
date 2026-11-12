@@ -19,6 +19,7 @@ let S = {
   cloneDir: null,
   avatarMap: {},
   autoPull: {},
+  hidden: {},
   settings: { avatars: true, limit: 2000, pullMode: 'ff', fileView: 'path', leftCollapsed: false, theme: 'dark', textSize: -1, refW: 150, graphW: null, compact: false, smart: false, cols: { ref: true, graph: true, msg: true, author: false, date: false, sha: false } },
 };
 const repos = new Map();
@@ -67,7 +68,7 @@ async function refresh(path, { statusOnly = false } = {}) {
       const st = await G.loadStatus(path);
       if (st.raw === r.data.status.raw) changed = false;
       else if (st.head.sha !== r.data.head.sha || st.head.branch !== r.data.head.branch) {
-        r.data = await G.loadRepo(path, r.limit, r.data);
+        r.data = await G.loadRepo(path, r.limit, r.data, hiddenOf(path));
       } else {
         const wasDirty = isDirty(r);
         r.data.status = st;
@@ -76,7 +77,7 @@ async function refresh(path, { statusOnly = false } = {}) {
       }
     } else {
       const first = !r.data;
-      r.data = await G.loadRepo(path, r.limit, r.data);
+      r.data = await G.loadRepo(path, r.limit, r.data, hiddenOf(path));
       if (first && r.data.gitDir) api.watch(path, r.data.gitDir);
       if (first && S.settings.avatars) {
         G.githubAvatars(path).then((found) => {
@@ -129,7 +130,7 @@ async function rebuild(r) {
     r.maxCol = g.maxCol;
     r.index = new Map(r.rows.map((row, i) => [row.commit.sha, i]));
     r.bySha = new Map([...d.commits, ...stashRows].map((c) => [c.sha, c]));
-    r.refMap = buildRefMap(d);
+    r.refMap = buildRefMap(d, r.path);
     r.version++;
     if (S.settings.avatars) await G.resolveAvatars([...new Set(d.commits.map((c) => c.email))]);
   }
@@ -144,10 +145,96 @@ async function rebuild(r) {
     if (f) r.view.file = f;
     else r.view = null;
   }
+  loadPr(r);
 }
 
-function buildRefMap(d) {
+// ---- hide in graph: refs the user chose to leave out of the graph, per repository.
+const hiddenOf = (path) => (S.hidden || {})[path] || [];
+const fullRef = (g) => (g.local ? 'refs/heads/' + g.local.name : g.remote ? 'refs/remotes/' + g.remote.name : g.tag ? 'refs/tags/' + g.tag.name : null);
+function isHidden(path, full) {
+  return hiddenOf(path).some((x) => x === full || (x.endsWith('/*') && full.startsWith(x.slice(0, -1))));
+}
+function setHidden(r, fulls, hide) {
+  const cur = new Set(hiddenOf(r.path));
+  for (const f of fulls) {
+    if (hide) cur.add(f);
+    else {
+      cur.delete(f);
+      // Showing one ref from a hidden group shows the whole group.
+      for (const x of [...cur]) if (x.endsWith('/*') && f.startsWith(x.slice(0, -1))) cur.delete(x);
+    }
+  }
+  S.hidden = { ...(S.hidden || {}), [r.path]: [...cur] };
+  save();
+  if (r.data) r.data.rawLog = null; // force the graph and labels to rebuild
+  refresh(r.path);
+}
+function eyeBtn(r, g) {
+  const full = fullRef(g);
+  if (!full || (g.local && g.local.head)) return null;
+  const hid = isHidden(r.path, full);
+  return h(
+    'button',
+    { class: 'eye' + (hid ? ' off' : ''), title: hid ? 'Show in graph' : 'Hide in graph', onclick: (e) => (e.stopPropagation(), setHidden(r, [full], !hid)), ondblclick: (e) => e.stopPropagation() },
+    icon(hid ? 'eyeOff' : 'eye', 14)
+  );
+}
+
+// ---- pull request for the current branch (GitHub, through the gh CLI)
+async function loadPr(r) {
+  const branch = (r.data && r.data.head.branch) || '';
+  if (r.prKey === branch && Date.now() - (r.prAt || 0) < 180000) return;
+  r.prKey = branch;
+  r.prAt = Date.now();
+  const fields = 'number,url,title,state,isDraft,headRefName';
+  const [cur, mine] = await Promise.all([
+    branch ? api.gh(['pr', 'list', '--head', branch, '--state', 'all', '--limit', '1', '--json', fields], r.path) : null,
+    api.gh(['pr', 'list', '--author', '@me', '--state', 'open', '--limit', '30', '--json', fields], r.path),
+  ]);
+  if (r.prKey !== branch) return;
+  const parse = (res) => {
+    try {
+      return res && res.code === 0 ? JSON.parse(res.stdout) : null;
+    } catch {
+      return null;
+    }
+  };
+  const m = parse(mine);
+  const c = parse(cur);
+  // Not a GitHub repository, or gh is missing or signed out: show nothing.
+  const pr = m || c ? { cur: (c && c[0]) || null, mine: m || [] } : null;
+  const was = JSON.stringify(r.pr);
+  r.pr = pr;
+  if (was !== JSON.stringify(pr) && R() === r) renderToolbar();
+}
+const prState = (pr) => (pr.isDraft && pr.state === 'OPEN' ? 'draft' : pr.state.toLowerCase());
+function prChip(r) {
+  const pr = r.pr;
+  if (!pr) return null;
+  const b = r.data.refs.locals.find((x) => x.head);
+  const canCreate = !pr.cur && b && b.upstream && !b.gone && !['main', 'master', 'develop', 'trunk'].includes(b.name);
+  if (!pr.cur && !pr.mine.length && !canCreate) return null;
+  const others = pr.mine.filter((x) => !pr.cur || x.number !== pr.cur.number);
+  const items = [
+    ...(pr.cur ? [{ header: 'This branch' }, { label: `#${pr.cur.number}  ${pr.cur.title}`, hint: prState(pr.cur), icon: 'pr', action: () => api.openUrl(pr.cur.url) }, { label: 'Copy link', icon: 'copy', action: () => api.copy(pr.cur.url) }] : []),
+    ...(canCreate ? [{ label: `Create pull request for ${b.name}…`, icon: 'plus', action: () => api.gh(['pr', 'create', '--web', '--head', b.name], r.path) }] : []),
+    ...(others.length ? ['-', { header: 'My open pull requests' }, ...others.map((x) => ({ label: `#${x.number}  ${x.title}`, hint: x.headRefName, icon: 'pr', action: () => api.openUrl(x.url) }))] : []),
+  ];
+  return h(
+    'button',
+    {
+      class: 'prchip ' + (pr.cur ? prState(pr.cur) : 'none'),
+      title: pr.cur ? `#${pr.cur.number} ${pr.cur.title} (${prState(pr.cur)})` : pr.mine.length ? `You have ${pr.mine.length} open pull request${pr.mine.length === 1 ? '' : 's'} in this repository` : 'Create a pull request',
+      onclick: (e) => menuAt(e.currentTarget, items, { right: true, minWidth: 360 }),
+    },
+    icon('pr', 15),
+    pr.cur ? '#' + pr.cur.number : pr.mine.length ? String(pr.mine.length) : 'Create PR'
+  );
+}
+
+function buildRefMap(d, path) {
   const m = new Map();
+  const hid = (full) => isHidden(path, full);
   const add = (sha, name, patch) => {
     let arr = m.get(sha);
     if (!arr) m.set(sha, (arr = []));
@@ -155,9 +242,9 @@ function buildRefMap(d) {
     if (!g) arr.push((g = { name }));
     Object.assign(g, patch);
   };
-  for (const l of d.refs.locals) add(l.sha, l.name, { local: l, head: l.head });
-  for (const x of d.refs.remotes) add(x.sha, x.short, { remote: x });
-  for (const t of d.refs.tags) add(t.sha, t.name, { tag: t });
+  for (const l of d.refs.locals) if (l.head || !hid('refs/heads/' + l.name)) add(l.sha, l.name, { local: l, head: l.head });
+  for (const x of d.refs.remotes) if (!hid('refs/remotes/' + x.name)) add(x.sha, x.short, { remote: x });
+  for (const t of d.refs.tags) if (!hid('refs/tags/' + t.name)) add(t.sha, t.name, { tag: t });
   if (!d.head.branch && d.head.sha) add(d.head.sha, 'HEAD', { head: true, detached: true });
   const rank = (g) => (g.head ? 0 : g.local ? 1 : g.remote ? 2 : 3);
   for (const arr of m.values()) arr.sort((a, b) => rank(a) - rank(b));
@@ -949,7 +1036,7 @@ function renderToolbar() {
       tbtn('stash', dirtyCount(d) ? 'Stash' : 'Nothing to stash', stash, !dirtyCount(d)),
       tbtn('pop', 'Pop stash', pop, !d.stashes.length)
     ),
-    h('div', { class: 'tright' }, tbtn('search', 'Search commits (⌘F)', () => toggleSearch(true)))
+    h('div', { class: 'tright' }, prChip(r), tbtn('search', 'Search commits (⌘F)', () => toggleSearch(true)))
   );
 }
 
@@ -1006,6 +1093,16 @@ function section(r, key, title, ico, count, body) {
           r.open[key] = !open;
           renderLeft();
         },
+        oncontextmenu: (e) => {
+          const glob = { local: 'refs/heads/*', remote: 'refs/remotes/*', tags: 'refs/tags/*' }[key];
+          if (!glob) return;
+          e.preventDefault();
+          const what = { local: 'local branches', remote: 'remote branches', tags: 'tags' }[key];
+          menu(e.clientX, e.clientY, [
+            { label: `Hide all ${what} in graph`, icon: 'eyeOff', action: () => setHidden(r, [glob], true) },
+            { label: `Show all ${what} in graph`, icon: 'eye', action: () => ((S.hidden = { ...(S.hidden || {}), [r.path]: hiddenOf(r.path).filter((x) => !x.startsWith(glob.slice(0, -1))) }), setHidden(r, [], false)) },
+          ]);
+        },
       },
       icon(open ? 'chevDown' : 'chevRight', 13, 'chev'),
       icon(ico, 17),
@@ -1045,7 +1142,7 @@ function renderLeft() {
     h(
       'div',
       {
-        class: 'ritem' + (b.head ? ' cur' : ''),
+        class: 'ritem' + (b.head ? ' cur' : '') + (!b.head && isHidden(r.path, 'refs/heads/' + b.name) ? ' hid' : ''),
         style: { paddingLeft: pad },
         title: b.name + (b.upstream ? `  →  ${b.upstream}` : ''),
         onclick: () => jump(b.sha),
@@ -1055,13 +1152,14 @@ function renderLeft() {
       b.head ? h('span', { class: 'cb' }, icon('check', 12)) : null,
       icon('branch', 14),
       h('span', { class: 'nm' }, name),
-      b.ahead || b.behind ? h('span', { class: 'ab' }, [b.ahead ? cap(b.ahead) + '↑' : '', b.behind ? cap(b.behind) + '↓' : ''].filter(Boolean).join(' ')) : null
+      b.ahead || b.behind ? h('span', { class: 'ab' }, [b.ahead ? cap(b.ahead) + '↑' : '', b.behind ? cap(b.behind) + '↓' : ''].filter(Boolean).join(' ')) : null,
+      eyeBtn(r, { local: b })
     );
   const remoteLeaf = (b, name, pad) =>
     h(
       'div',
       {
-        class: 'ritem',
+        class: 'ritem' + (isHidden(r.path, 'refs/remotes/' + b.name) ? ' hid' : ''),
         style: { paddingLeft: pad },
         title: b.name,
         onclick: () => jump(b.sha),
@@ -1069,7 +1167,8 @@ function renderLeft() {
         oncontextmenu: (e) => refMenu(e, { remote: b, name: b.short }),
       },
       icon('branch', 14),
-      h('span', { class: 'nm' }, name)
+      h('span', { class: 'nm' }, name),
+      eyeBtn(r, { remote: b })
     );
 
   const locals = d.refs.locals.filter((b) => match(b.name));
@@ -1127,9 +1226,10 @@ function renderLeft() {
         ? tags.map((t) =>
             h(
               'div',
-              { class: 'ritem', style: { paddingLeft: '30px' }, title: t.name, onclick: () => jump(t.sha), oncontextmenu: (e) => refMenu(e, { tag: t, name: t.name }) },
+              { class: 'ritem' + (isHidden(r.path, 'refs/tags/' + t.name) ? ' hid' : ''), style: { paddingLeft: '30px' }, title: t.name, onclick: () => jump(t.sha), oncontextmenu: (e) => refMenu(e, { tag: t, name: t.name }) },
               icon('tag', 14),
-              h('span', { class: 'nm' }, t.name)
+              h('span', { class: 'nm' }, t.name),
+              eyeBtn(r, { tag: t })
             )
           )
         : [h('div', { class: 'empty' }, 'No tags')]
@@ -1218,6 +1318,12 @@ function refMenu(e, g) {
       action: async () => (await confirmBox('Delete tag', `Delete the tag ${t.name} locally?`, 'Delete', true)) && op('Delete tag', ['tag', '-d', t.name]),
     });
   }
+  const full = fullRef(g);
+  if (full && !isCur) {
+    const hid = isHidden(r.path, full);
+    items.push('-', { label: hid ? 'Show in graph' : 'Hide in graph', icon: hid ? 'eye' : 'eyeOff', action: () => setHidden(r, [full], !hid) });
+  }
+  if (hiddenOf(r.path).length) items.push({ label: 'Show everything hidden', icon: 'eye', action: () => ((S.hidden[r.path] = []), setHidden(r, [], false)) });
   items.push('-', { label: 'Copy name', icon: 'copy', action: () => api.copy(target) });
   menu(e.clientX, e.clientY, items);
 }
@@ -2313,6 +2419,6 @@ async function init() {
     for (const p of INFO.devOpen.split(':')) await openRepo(p, { quiet: true });
   } else activate(S.active);
  wireDrops();
-  window.__app = { autoPullRun, autoPullDialog, autoState, applyAppearance, editProfile, moveTab, openMany, columnsMenu, applyGraphSettings, S: () => S, R, repos, openRepo, selectSha, openDiff, refresh, squash, squashable, headChain, cloneDialog, profileMenu, commitMenu, activate, checkout, cherryPick, resetTo, stash, pop, mergeInto, rebaseOnto, undo, redo, stage, unstage, stageAll, doCommit, switchProfile, applyHunk, push, pull, createBranch, G };
+  window.__app = { setHidden, isHidden, loadPr, autoPullRun, autoPullDialog, autoState, applyAppearance, editProfile, moveTab, openMany, columnsMenu, applyGraphSettings, S: () => S, R, repos, openRepo, selectSha, openDiff, refresh, squash, squashable, headChain, cloneDialog, profileMenu, commitMenu, activate, checkout, cherryPick, resetTo, stash, pop, mergeInto, rebaseOnto, undo, redo, stage, unstage, stageAll, doCommit, switchProfile, applyHunk, push, pull, createBranch, G };
 }
 init();

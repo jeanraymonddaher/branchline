@@ -18,6 +18,7 @@ contextBridge.exposeInMainWorld('api', {
   reveal: call('reveal'),
   copy: call('copy'),
   info: call('info'),
+  openUrl: call('openUrl'),
   checkUpdates: call('update:check'),
   onUpdateAvailable: (fn) => ipcRenderer.on('update-available', (e, v) => fn(v)),
   pathFor: (file) => webUtils.getPathForFile(file),

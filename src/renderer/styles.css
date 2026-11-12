@@ -444,3 +444,18 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent); }
 html[data-theme=ocean] { --side: #cfd9e3; }
 html[data-theme=light] { --side: #2a2e36; --sidecur: #0c0e12; --lbltext: #1d2026; --lblhead: #0c0e12; }
 html[data-theme=light] .band { opacity: .16; }
+
+/* hide in graph */
+.ritem .eye { display: none; background: none; border: none; padding: 1px 2px; color: var(--dim); flex: none; }
+.ritem:hover .eye, .ritem .eye.off { display: inline-flex; }
+.ritem .eye:hover { color: var(--bright); }
+.ritem.hid .nm, .ritem.hid > .ico { opacity: .45; }
+/* pull request chip */
+.tright { align-items: center; }
+.prchip { display: inline-flex; align-items: center; gap: 5px; height: 26px; padding: 0 9px; border-radius: 4px; border: 1px solid var(--line2); background: var(--bg1); color: var(--bright); font-weight: 600; white-space: nowrap; }
+.prchip:hover { filter: brightness(1.2); }
+.prchip.open .ico { color: #57c764; } .prchip.merged .ico { color: #a880f0; } .prchip.closed .ico { color: #e5645f; } .prchip.draft .ico { color: var(--dim); }
+.prchip.none { font-weight: 400; color: var(--text); }
+/* current-branch tick */
+.ritem.cur .cb { background: #43b649; }
+.ritem.cur .cb svg { stroke-width: 2.8; stroke: #fff; }
