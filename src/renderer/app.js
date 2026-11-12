@@ -357,10 +357,10 @@ async function fetchAll() {
   await op('Fetch all', ['fetch', '--all', '--prune', '--tags']);
 }
 const PULL = {
-  fetch: { label: 'Fetch All', args: ['fetch', '--all', '--prune', '--tags'] },
-  ff: { label: 'Pull (fast-forward if possible)', args: ['pull', '--no-rebase', '--ff'] },
-  'ff-only': { label: 'Pull (fast-forward only)', args: ['pull', '--ff-only'] },
-  rebase: { label: 'Pull (rebase)', args: ['pull', '--rebase'] },
+  fetch: { tip: 'Fetch all — download new commits from every remote without changing your branch.', label: 'Fetch All', args: ['fetch', '--all', '--prune', '--tags'] },
+  ff: { tip: 'Pull — bring the remote changes into your current branch (fast-forward if possible, otherwise merge).', label: 'Pull (fast-forward if possible)', args: ['pull', '--no-rebase', '--ff'] },
+  'ff-only': { tip: 'Pull — bring the remote changes into your current branch, only if it can fast-forward.', label: 'Pull (fast-forward only)', args: ['pull', '--ff-only'] },
+  rebase: { tip: 'Pull — bring the remote changes in and replay your local commits on top of them (rebase).', label: 'Pull (rebase)', args: ['pull', '--rebase'] },
 };
 async function pull(mode = S.settings.pullMode) {
   const p = PULL[mode] || PULL.ff;
@@ -1060,7 +1060,7 @@ function renderToolbar() {
       'div',
       {
         class: 'crumb',
-        title: 'Switch branch',
+        title: 'Current branch. Click to switch to another branch.',
         onclick: (e) =>
           menuAt(
             e.currentTarget,
@@ -1073,16 +1073,16 @@ function renderToolbar() {
     h(
       'div',
       { class: 'tcenter' },
-      tbtn('refresh', 'Fetch all', fetchAll),
+      tbtn('refresh', 'Fetch all — download new commits, branches and tags from every remote. Your files are not changed.', fetchAll),
       h(
         'div',
         { class: 'grp' },
-        tbtn('pull', PULL[S.settings.pullMode].label, () => pull()),
+        tbtn('pull', PULL[S.settings.pullMode].tip, () => pull()),
         h(
           'button',
           {
             class: 'iconbtn dd',
-            title: 'Pull options',
+            title: 'Choose what the Pull button does: fetch only, fast-forward, or rebase',
             onclick: (e) =>
               menuAt(
                 e.currentTarget,
@@ -1101,12 +1101,12 @@ function renderToolbar() {
           icon('caret', 12)
         )
       ),
-      tbtn('push', 'Push', () => push()),
-      tbtn('branch', 'Create branch', () => createBranch()),
-      tbtn('stash', dirtyCount(d) ? 'Stash' : 'Nothing to stash', stash, !dirtyCount(d)),
-      tbtn('pop', 'Pop stash', pop, !d.stashes.length)
+      tbtn('push', 'Push — upload the commits on your current branch to the remote', () => push()),
+      tbtn('branch', 'Branch — create a new branch from the current commit', () => createBranch()),
+      tbtn('stash', dirtyCount(d) ? 'Stash — set your uncommitted changes aside so the working directory is clean' : 'Stash — nothing to stash, there are no uncommitted changes', stash, !dirtyCount(d)),
+      tbtn('pop', d.stashes.length ? 'Pop — put the most recent stash back into your working directory and remove it from the stash list' : 'Pop — there are no stashes', pop, !d.stashes.length)
     ),
-    h('div', { class: 'tright' }, prChip(r), tbtn('search', 'Search commits (⌘F)', () => toggleSearch(true)))
+    h('div', { class: 'tright' }, prChip(r), tbtn('search', 'Search commits by message, author or SHA (⌘F)', () => toggleSearch(true)))
   );
 }
 
@@ -1206,18 +1206,25 @@ function renderLeft() {
     d.refs.tags.length ? railItem('tags', 'tag', d.refs.tags.length, 'tags') : null,
     d.stashes.length ? railItem('stashes', 'box', d.stashes.length, 'stashes') : null
   );
-  const jump = (sha) => selectSha(sha, true);
+  // Selected refs: drop any that no longer exist, and record the on-screen order for shift-click.
+  const all = new Set([...d.refs.locals.map((b) => 'refs/heads/' + b.name), ...d.refs.remotes.map((b) => 'refs/remotes/' + b.name), ...d.refs.tags.map((t) => 'refs/tags/' + t.name)]);
+  r.refSel = new Set([...(r.refSel || [])].filter((x) => all.has(x)));
+  const order = (r.refOrder = []);
+  const selCls = (full) => (order.push(full), r.refSel.has(full) ? ' sel' : '');
+  box.onclick = (e) => {
+    if (!e.target.closest('.ritem, .sec') && r.refSel.size) (r.refSel = new Set()), renderLeft();
+  };
 
   const localLeaf = (b, name, pad) =>
     h(
       'div',
       {
-        class: 'ritem' + (b.head ? ' cur' : '') + (!b.head && isHidden(r.path, 'refs/heads/' + b.name) ? ' hid' : ''),
+        class: 'ritem' + (b.head ? ' cur' : '') + (!b.head && isHidden(r.path, 'refs/heads/' + b.name) ? ' hid' : '') + selCls('refs/heads/' + b.name),
         style: { paddingLeft: pad },
         title: b.name + (b.upstream ? `  →  ${b.upstream}` : ''),
-        onclick: () => jump(b.sha),
+        onclick: (e) => refClick(e, r, 'refs/heads/' + b.name, b.sha),
         ondblclick: () => checkout(b),
-        oncontextmenu: (e) => refMenu(e, { local: b, name: b.name }),
+        oncontextmenu: (e) => refMenu(e, { local: b, name: b.name }, true),
       },
       b.head ? h('span', { class: 'cb' }, icon('check', 12)) : null,
       icon('branch', 14),
@@ -1229,12 +1236,12 @@ function renderLeft() {
     h(
       'div',
       {
-        class: 'ritem' + (isHidden(r.path, 'refs/remotes/' + b.name) ? ' hid' : ''),
+        class: 'ritem' + (isHidden(r.path, 'refs/remotes/' + b.name) ? ' hid' : '') + selCls('refs/remotes/' + b.name),
         style: { paddingLeft: pad },
         title: b.name,
-        onclick: () => jump(b.sha),
+        onclick: (e) => refClick(e, r, 'refs/remotes/' + b.name, b.sha),
         ondblclick: () => checkout(b),
-        oncontextmenu: (e) => refMenu(e, { remote: b, name: b.short }),
+        oncontextmenu: (e) => refMenu(e, { remote: b, name: b.short }, true),
       },
       icon('branch', 14),
       h('span', { class: 'nm' }, name),
@@ -1296,7 +1303,7 @@ function renderLeft() {
         ? tags.map((t) =>
             h(
               'div',
-              { class: 'ritem' + (isHidden(r.path, 'refs/tags/' + t.name) ? ' hid' : ''), style: { paddingLeft: '30px' }, title: t.name, onclick: () => jump(t.sha), oncontextmenu: (e) => refMenu(e, { tag: t, name: t.name }) },
+              { class: 'ritem' + (isHidden(r.path, 'refs/tags/' + t.name) ? ' hid' : '') + selCls('refs/tags/' + t.name), style: { paddingLeft: '30px' }, title: t.name, onclick: (e) => refClick(e, r, 'refs/tags/' + t.name, t.sha), oncontextmenu: (e) => refMenu(e, { tag: t, name: t.name }, true) },
               icon('tag', 14),
               h('span', { class: 'nm' }, t.name),
               eyeBtn(r, { tag: t })
@@ -1337,11 +1344,96 @@ function stashMenu(e, s) {
   ]);
 }
 
+// ---- selecting refs in the left panel: click selects one, ⌘-click toggles, shift-click selects a range.
+function refClick(e, r, full, sha) {
+  const order = r.refOrder || [];
+  const sel = r.refSel || (r.refSel = new Set());
+  if (e.shiftKey && r.refAnchor && order.includes(r.refAnchor)) {
+    const a = order.indexOf(r.refAnchor);
+    const b = order.indexOf(full);
+    r.refSel = new Set(order.slice(Math.min(a, b), Math.max(a, b) + 1));
+  } else if (e.metaKey) {
+    sel.has(full) ? sel.delete(full) : sel.add(full);
+    r.refAnchor = full;
+  } else {
+    r.refSel = new Set([full]);
+    r.refAnchor = full;
+    if (sha) selectSha(sha, true);
+  }
+  renderLeft();
+}
+function selectedRefs(r) {
+  const d = r.data.refs;
+  const out = [];
+  for (const full of r.refSel || []) {
+    const g = full.startsWith('refs/heads/')
+      ? { local: d.locals.find((b) => b.name === full.slice(11)) }
+      : full.startsWith('refs/remotes/')
+        ? { remote: d.remotes.find((b) => b.name === full.slice(13)) }
+        : { tag: d.tags.find((t) => t.name === full.slice(10)) };
+    if (g.local || g.remote || g.tag) out.push({ full, ...g });
+  }
+  return out;
+}
+function bulkRefMenu(e, r) {
+  const gs = selectedRefs(r);
+  const hideable = gs.filter((g) => !(g.local && g.local.head));
+  const shown = hideable.filter((g) => !isHidden(r.path, g.full));
+  const hidden = hideable.filter((g) => isHidden(r.path, g.full));
+  const deletable = hideable;
+  const names = gs.map((g) => (g.local || g.remote || g.tag).name);
+  const items = [];
+  if (shown.length) items.push({ label: `Hide ${shown.length} in graph`, icon: 'eyeOff', action: () => setHidden(r, shown.map((g) => g.full), true) });
+  if (hidden.length) items.push({ label: `Show ${hidden.length} in graph`, icon: 'eye', action: () => setHidden(r, hidden.map((g) => g.full), false) });
+  items.push('-', { label: `Copy ${names.length} names`, icon: 'copy', action: () => (api.copy(names.join('\n')), toast(`Copied ${names.length} names`)) });
+  if (deletable.length) items.push('-', { label: `Delete ${deletable.length} selected…`, danger: true, action: () => bulkDelete(r, deletable) });
+  items.push('-', { label: 'Clear selection', action: () => ((r.refSel = new Set()), renderLeft()) });
+  menu(e.clientX, e.clientY, items);
+}
+async function bulkDelete(r, gs) {
+  const locals = gs.filter((g) => g.local).map((g) => g.local.name);
+  const remotes = gs.filter((g) => g.remote).map((g) => g.remote);
+  const tags = gs.filter((g) => g.tag).map((g) => g.tag.name);
+  const parts = [
+    locals.length ? `${locals.length} local branch${locals.length > 1 ? 'es' : ''}` : '',
+    remotes.length ? `${remotes.length} remote branch${remotes.length > 1 ? 'es' : ''}` : '',
+    tags.length ? `${tags.length} local tag${tags.length > 1 ? 's' : ''}` : '',
+  ].filter(Boolean);
+  const msg = `Delete ${parts.join(', ')}?` + (remotes.length ? ' Remote branches are removed for everyone.' : '');
+  const detail = [...locals, ...remotes.map((b) => b.name), ...tags.map((t) => 'tag: ' + t)].join('\n');
+  if (!(await confirmBox(`Delete ${gs.length} selected`, msg, remotes.length ? 'Delete, Including Remote' : 'Delete', true, detail))) return;
+  r.refSel = new Set();
+  const gone = new Set(gs.map((g) => g.full));
+  if (S.hidden && S.hidden[r.path]) (S.hidden[r.path] = S.hidden[r.path].filter((x) => !gone.has(x))), save();
+  if (locals.length) {
+    const res = await op(`Delete ${locals.length} branches`, ['branch', '-d', ...locals], { silentFail: true });
+    if (res && res.failed) {
+      const left = [...res.stderr.matchAll(/branch '(.+?)' is not fully merged/g)].map((m) => m[1]);
+      if (!left.length) gitError('Delete failed', res);
+      else if (await confirmBox('Branches not merged', `${left.length} of them ${left.length > 1 ? 'have' : 'has'} commits that are not merged anywhere else. Delete anyway?`, 'Force Delete', true, left.join('\n')))
+        await op(`Delete ${left.length} branches`, ['branch', '-D', ...left]);
+    }
+  }
+  if (tags.length) await op(`Delete ${tags.length} tags`, ['tag', '-d', ...tags]);
+  for (const rem of new Set(remotes.map((b) => b.remote))) {
+    const shorts = remotes.filter((b) => b.remote === rem).map((b) => b.short);
+    await op(`Delete ${shorts.length} on ${rem}`, ['push', rem, '--delete', ...shorts]);
+  }
+  renderLeft();
+}
+
 // Context menu for a ref group: {name, local?, remote?, tag?}
-function refMenu(e, g) {
+function refMenu(e, g, fromLeft) {
   e.preventDefault();
   e.stopPropagation();
   const r = R();
+  if (fromLeft) {
+    const f = fullRef(g);
+    if (r.refSel && r.refSel.has(f) && r.refSel.size > 1) return bulkRefMenu(e, r);
+    r.refSel = new Set([f]);
+    r.refAnchor = f;
+    renderLeft();
+  }
   const cur = r.data.head.branch;
   const items = [];
   const target = g.local ? g.local.name : g.remote ? g.remote.name : g.tag ? g.tag.name : null;
@@ -1810,8 +1902,8 @@ function fileRow(r, f, mode, label, pad) {
     },
     statusIcon(f.status),
     h('span', { class: 'fpath' }, label != null ? h('span', { class: 'fname' }, label) : [h('span', { class: 'fdir' }, f.path.slice(0, slash + 1)), h('span', { class: 'fname' }, f.path.slice(slash + 1))]),
-    mode === 'unstaged' ? h('button', { class: 'mini green', onclick: (e) => (e.stopPropagation(), stage([f])) }, 'Stage File') : null,
-    mode === 'staged' ? h('button', { class: 'mini red', onclick: (e) => (e.stopPropagation(), unstage([f])) }, 'Unstage File') : null
+    mode === 'unstaged' ? h('button', { class: 'mini green', title: 'Add this file to the next commit', onclick: (e) => (e.stopPropagation(), stage([f])) }, 'Stage File') : null,
+    mode === 'staged' ? h('button', { class: 'mini red', title: 'Take this file out of the next commit. Your changes are kept.', onclick: (e) => (e.stopPropagation(), unstage([f])) }, 'Unstage File') : null
   );
 }
 function fileList(r, files, mode) {
@@ -1869,8 +1961,8 @@ function viewToggle(r) {
     h(
       'div',
       { class: 'vtoggle' },
-      h('button', { class: S.settings.fileView === 'path' ? 'on' : '', onclick: set('path') }, icon('list', 13), 'Path'),
-      h('button', { class: S.settings.fileView === 'tree' ? 'on' : '', onclick: set('tree') }, icon('tree', 13), 'Tree')
+      h('button', { class: S.settings.fileView === 'path' ? 'on' : '', title: 'Show files as a flat list of paths', onclick: set('path') }, icon('list', 13), 'Path'),
+      h('button', { class: S.settings.fileView === 'tree' ? 'on' : '', title: 'Show files grouped by folder', onclick: set('tree') }, icon('tree', 13), 'Tree')
     )
   );
 }
@@ -1951,7 +2043,7 @@ function renderRight() {
       h(
         'div',
         { class: 'cdmulti' },
-        h('button', { class: 'btn', onclick: () => cherryPick(shas) }, `Cherry pick ${shas.length} commits`),
+        h('button', { class: 'btn', title: 'Copy the selected commits onto your current branch, oldest first', onclick: () => cherryPick(shas) }, `Cherry pick ${shas.length} commits`),
         h('button', { class: 'btn', disabled: typeof sq === 'string', title: typeof sq === 'string' ? sq : '', onclick: () => squash(shas) }, `Squash ${shas.length} commits`)
       ),
       fileStats(files, fs),
@@ -1980,6 +2072,7 @@ function renderWip(r, box) {
   const setBtn = () => {
     const ready = canCommit && m.summary.trim();
     btn.className = 'commitbtn' + (ready ? ' ready' : '');
+    btn.title = ready ? (m.amend ? 'Replace the last commit with one that includes the staged changes and this message' : 'Save the staged files as a new commit on the current branch (⌘Enter)') : !m.summary.trim() && canCommit ? 'Type a commit summary first' : st.conflicted.length ? 'Resolve the conflicted files first' : 'Stage at least one file, then type a summary';
     put(btn, 
       icon('commit', 14),
       m.amend ? 'Amend Previous Commit' : st.staged.length ? `Commit changes to ${plural(st.staged.length, 'file')}` : st.unstaged.length ? 'Stage Changes to Commit' : 'Nothing to commit'
@@ -1993,9 +2086,9 @@ function renderWip(r, box) {
         icon('warn', 15, 'c-con'),
         h('span', {}, `${d.op[0].toUpperCase() + d.op.slice(1)} in progress` + (st.conflicted.length ? ` — ${plural(st.conflicted.length, 'conflict')}` : '')),
         h('span', { class: 'sp' }),
-        d.op === 'rebase' ? h('button', { class: 'mini', onclick: () => continueOp(d.op, 'skip') }, 'Skip') : null,
-        h('button', { class: 'mini red', onclick: () => continueOp(d.op, 'abort') }, 'Abort'),
-        h('button', { class: 'mini green', disabled: st.conflicted.length > 0, onclick: () => continueOp(d.op, 'continue') }, 'Continue')
+        d.op === 'rebase' ? h('button', { class: 'mini', title: 'Skip this commit and carry on with the rebase', onclick: () => continueOp(d.op, 'skip') }, 'Skip') : null,
+        h('button', { class: 'mini red', title: 'Stop and go back to how things were before this started', onclick: () => continueOp(d.op, 'abort') }, 'Abort'),
+        h('button', { class: 'mini green', title: st.conflicted.length ? 'Resolve and stage the conflicted files first' : 'Carry on now that conflicts are resolved', disabled: st.conflicted.length > 0, onclick: () => continueOp(d.op, 'continue') }, 'Continue')
       )
     : null;
   put(box, 
@@ -2024,7 +2117,7 @@ function renderWip(r, box) {
         icon('chevDown', 11),
         `Unstaged Files (${st.unstaged.length})`,
         h('span', { class: 'sp' }),
-        st.unstaged.length ? h('button', { class: 'mini green', onclick: stageAll }, 'Stage All Changes') : null
+        st.unstaged.length ? h('button', { class: 'mini green', title: 'Add every changed file to the next commit', onclick: stageAll }, 'Stage All Changes') : null
       ),
       h('div', { class: 'flist' }, fileList(r, st.unstaged, 'unstaged'))
     ),
@@ -2037,7 +2130,7 @@ function renderWip(r, box) {
         icon('chevDown', 11),
         `Staged Files (${st.staged.length})`,
         h('span', { class: 'sp' }),
-        st.staged.length ? h('button', { class: 'mini red', onclick: unstageAll }, 'Unstage All Changes') : null
+        st.staged.length ? h('button', { class: 'mini red', title: 'Take every file out of the next commit. Your changes are kept.', onclick: unstageAll }, 'Unstage All Changes') : null
       ),
       h('div', { class: 'flist' }, fileList(r, st.staged, 'staged'))
     ),
@@ -2245,9 +2338,9 @@ async function renderDiff() {
           { class: 'hunkh' },
           h('span', {}, hk.header),
           h('span', { class: 'sp' }),
-          canHunk && v.mode === 'unstaged' ? h('button', { class: 'mini red', onclick: () => applyHunk(d, hk, 'discard') }, 'Discard Hunk') : null,
-          canHunk && v.mode === 'unstaged' ? h('button', { class: 'mini green', onclick: () => applyHunk(d, hk, 'stage') }, 'Stage Hunk') : null,
-          canHunk && v.mode === 'staged' ? h('button', { class: 'mini red', onclick: () => applyHunk(d, hk, 'unstage') }, 'Unstage Hunk') : null
+          canHunk && v.mode === 'unstaged' ? h('button', { class: 'mini red', title: 'Throw away this block of changes. This cannot be undone.', onclick: () => applyHunk(d, hk, 'discard') }, 'Discard Hunk') : null,
+          canHunk && v.mode === 'unstaged' ? h('button', { class: 'mini green', title: 'Add only this block of changes to the next commit', onclick: () => applyHunk(d, hk, 'stage') }, 'Stage Hunk') : null,
+          canHunk && v.mode === 'staged' ? h('button', { class: 'mini red', title: 'Take this block of changes out of the next commit', onclick: () => applyHunk(d, hk, 'unstage') }, 'Unstage Hunk') : null
         )
       );
     let ol = hk.o;
@@ -2320,8 +2413,8 @@ async function renderDiff() {
       statusIcon(f.status),
       h('span', { class: 'dpath' }, f.orig ? `${f.orig} → ${f.path}` : f.path),
       h('span', { class: 'dmode' }, v.range ? `${short(v.range.oldest.sha)} → ${short(v.range.newest.sha)}` : v.mode === 'commit' ? 'commit ' + short(v.sha) : v.mode === 'staged' ? 'Staged' : 'Unstaged'),
-      v.mode === 'unstaged' && f.status !== 'U' ? h('button', { class: 'mini green', onclick: () => stage([f]) }, 'Stage File') : null,
-      v.mode === 'staged' ? h('button', { class: 'mini red', onclick: () => unstage([f]) }, 'Unstage File') : null,
+      v.mode === 'unstaged' && f.status !== 'U' ? h('button', { class: 'mini green', title: 'Add this file to the next commit', onclick: () => stage([f]) }, 'Stage File') : null,
+      v.mode === 'staged' ? h('button', { class: 'mini red', title: 'Take this file out of the next commit. Your changes are kept.', onclick: () => unstage([f]) }, 'Unstage File') : null,
       h('button', { class: 'iconbtn', title: 'Close (Esc)', onclick: closeDiff }, icon('close', 16))
     ),
     h(
@@ -2369,8 +2462,8 @@ function renderWelcome() {
     h(
       'div',
       { class: 'wbtns' },
-      h('button', { class: 'btn primary', onclick: pickRepo }, 'Open repositories'),
-      h('button', { class: 'btn', onclick: cloneDialog }, 'Clone from GitHub')
+      h('button', { class: 'btn primary', title: 'Pick one or more repository folders on this Mac; each opens in its own tab', onclick: pickRepo }, 'Open repositories'),
+      h('button', { class: 'btn', title: 'Download one of your GitHub repositories to this Mac and open it', onclick: cloneDialog }, 'Clone from GitHub')
     ),
     S.recent.length
       ? h(

@@ -93,7 +93,7 @@ export function toast(text, { spin = false, ms = 3500 } = {}) {
       body.replaceChildren(
         h('div', { class: 'ttitle' }, title),
         detail ? h('pre', {}, detail) : null,
-        h('button', { class: 'tclose', onclick: () => el.remove() }, icon('close', 12))
+        h('button', { class: 'tclose', title: 'Dismiss', onclick: () => el.remove() }, icon('close', 12))
       );
       clearTimeout(timer);
       timer = setTimeout(() => el.remove(), 30000);
@@ -297,3 +297,45 @@ export function debounce(fn, ms) {
     t = setTimeout(() => fn(...a), ms);
   };
 }
+
+// ---- tooltips: anything with a title gets a quick, styled hint instead of the slow native one.
+(() => {
+  let tip, timer, cur;
+  const hide = () => {
+    clearTimeout(timer);
+    if (tip) tip.remove();
+    tip = cur = null;
+  };
+  const show = (el) => {
+    const text = el.dataset.tip;
+    if (!text || !el.isConnected) return;
+    tip = document.createElement('div');
+    tip.className = 'tip';
+    tip.textContent = text;
+    document.body.appendChild(tip);
+    const b = el.getBoundingClientRect();
+    const t = tip.getBoundingClientRect();
+    const x = Math.max(6, Math.min(innerWidth - t.width - 6, b.left + b.width / 2 - t.width / 2));
+    const below = b.bottom + 7 + t.height < innerHeight - 4;
+    tip.style.left = x + 'px';
+    tip.style.top = (below ? b.bottom + 7 : b.top - t.height - 7) + 'px';
+    tip.classList.add('on');
+  };
+  document.addEventListener('mouseover', (e) => {
+    const el = e.target.closest && e.target.closest('[title], [data-tip]');
+    if (el && el.hasAttribute('title')) {
+      // Move the text out of `title` so the native tooltip does not show as well.
+      const v = el.getAttribute('title');
+      el.removeAttribute('title');
+      if (v) (el.dataset.tip = v), el.getAttribute('aria-label') || el.setAttribute('aria-label', v);
+      else delete el.dataset.tip;
+    }
+    if (el === cur) return;
+    hide();
+    if (!el) return;
+    cur = el;
+    timer = setTimeout(() => show(el), el.matches('button, .iconbtn, [role=button]') ? 350 : 700);
+  });
+  for (const ev of ['mousedown', 'wheel', 'keydown', 'blur']) window.addEventListener(ev, hide, true);
+  document.addEventListener('mouseleave', hide);
+})();

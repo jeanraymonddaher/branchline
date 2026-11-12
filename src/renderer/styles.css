@@ -652,3 +652,14 @@ html[data-theme=light] .commitbtn.ready { background: #2c8a2a; color: #fff; }
 /* short windows: each staging list keeps room for its header and two rows */
 .fsec { min-height: 104px; }
 .fsec.small { min-height: 0; }
+
+/* refs selected in the left panel (click, cmd-click, shift-click) */
+.ritem { user-select: none; }
+.ritem.sel { background: color-mix(in srgb, var(--accent) 26%, transparent); box-shadow: inset 2px 0 0 var(--accent); }
+.ritem.sel .nm { color: var(--bright); }
+.ritem.sel:hover { background: color-mix(in srgb, var(--accent) 34%, transparent); }
+.ritem.cur.sel { background: var(--greenbg); }
+
+/* quick tooltips */
+.tip { position: fixed; z-index: 200; max-width: 280px; padding: 6px 9px; border-radius: 5px; background: var(--menu); border: 1px solid var(--menuline); color: var(--bright); font-size: calc(12.5px + var(--fz)); line-height: 1.4; white-space: pre-wrap; overflow-wrap: anywhere; box-shadow: 0 6px 18px rgba(0,0,0,.45); pointer-events: none; opacity: 0; transition: opacity .1s; }
+.tip.on { opacity: 1; }
