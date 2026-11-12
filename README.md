@@ -16,6 +16,13 @@ A graph-first Git client for macOS with profile switching, inspired by GitKraken
 - Pull request chip for the current branch and clone from GitHub (both use the `gh` CLI)
 - Themes (Dark, Midnight, Ocean, Light), text size, collapsible side panel, self-updating
 
+## Optional features
+
+Both are off by default; turn them on in Preferences.
+
+- **Pull requests** — open pull requests listed in the left panel, with check status and review state shown there and next to each branch. Double-click one to check it out. Uses the `gh` CLI.
+- **Ticket keys** — keys such as `ABC-1234` in branch names and commit messages link to your Jira, and the key from the current branch is offered as a commit summary prefix.
+
 ## Install on another Mac
 
 Paste this into Terminal:

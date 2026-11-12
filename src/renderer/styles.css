@@ -706,3 +706,28 @@ html[data-theme=light] .commitbtn.ready { background: #2c8a2a; color: #fff; }
 .hmeta span:first-child { overflow: hidden; text-overflow: ellipsis; }
 .hmeta .hsha { font-family: var(--mono); margin-left: auto; }
 .dhead .mini { display: inline-flex; align-items: center; gap: 5px; }
+
+/* optional: pull requests in the left panel */
+.secbody[data-key=prs] { flex-grow: 2; }
+.ckdot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--faint); display: inline-block; }
+.ckdot.pass { background: var(--green); }
+.ckdot.fail { background: var(--red); }
+.ckdot.pending { background: var(--yellow); }
+.ckdot.none { background: none; box-shadow: inset 0 0 0 1.5px var(--faint); }
+.pritem .prn { color: var(--dim); font-size: calc(12px + var(--fz)); flex: none; }
+.pritem.draft .nm { opacity: .6; }
+.pritem.mine .nm { color: var(--bright); }
+.rv { flex: none; display: inline-flex; }
+.rv.ok { color: var(--green); }
+.rv.chg { color: var(--orange); }
+.rv svg { stroke-width: 2.4; }
+.prb { flex: none; display: inline-flex; align-items: center; gap: 4px; padding: 0 6px; height: 17px; border-radius: 9px; border: 1px solid var(--line2); color: var(--text2); font-size: calc(11px + var(--fz)); cursor: pointer; }
+.prb:hover { border-color: var(--accent); color: var(--bright); }
+.prb .ckdot { width: 7px; height: 7px; }
+
+/* optional: ticket keys */
+.tktrow { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.tkt { border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent); background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); border-radius: 3px; padding: 1px 7px; font-size: calc(12px + var(--fz)); font-weight: 600; cursor: pointer; }
+.tkt:hover { background: color-mix(in srgb, var(--accent) 26%, transparent); }
+.amendrow .amend { flex: 1; }
+.tktfill { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 55%, transparent); }

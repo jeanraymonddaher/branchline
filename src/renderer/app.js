@@ -147,6 +147,7 @@ async function rebuild(r) {
     else r.view = null;
   }
   loadPr(r);
+  loadPrList(r);
 }
 
 // GitHub remotes show the owner's picture (the org or user logo) instead of a globe.
@@ -263,6 +264,95 @@ function prChip(r) {
     pr.cur ? '#' + pr.cur.number : pr.mine.length ? String(pr.mine.length) : 'Create PR'
   );
 }
+
+// ---- optional (Preferences): pull request list in the left panel, with checks and review state on branches
+function prChecks(pr) {
+  const xs = pr.statusCheckRollup || [];
+  if (!xs.length) return 'none';
+  if (xs.some((x) => /^(FAILURE|ERROR|TIMED_OUT|CANCELLED|ACTION_REQUIRED|STARTUP_FAILURE)$/.test(x.conclusion || x.state || ''))) return 'fail';
+  if (xs.some((x) => (x.status && x.status !== 'COMPLETED') || /^(PENDING|EXPECTED)$/.test(x.state || ''))) return 'pending';
+  return 'pass';
+}
+const CHECK_TXT = { pass: 'checks passed', fail: 'checks failed', pending: 'checks running', none: 'no checks' };
+const REVIEW_TXT = { APPROVED: 'approved', CHANGES_REQUESTED: 'changes requested', REVIEW_REQUIRED: 'review required' };
+const prTip = (pr) => `#${pr.number} ${pr.title}\n${pr.author?.login || ''}${pr.isDraft ? ' · draft' : ''} · ${CHECK_TXT[prChecks(pr)]}${REVIEW_TXT[pr.reviewDecision] ? ' · ' + REVIEW_TXT[pr.reviewDecision] : ''}`;
+async function loadPrList(r, force) {
+  if (!S.settings.prs) return;
+  if (!force && Date.now() - (r.prsAt || 0) < 120000) return;
+  r.prsAt = Date.now();
+  const res = await api.gh(['pr', 'list', '--state', 'open', '--limit', '60', '--json', 'number,url,title,isDraft,headRefName,author,reviewDecision,statusCheckRollup,isCrossRepository'], r.path);
+  let list = null;
+  try {
+    if (res.code === 0) list = JSON.parse(res.stdout);
+  } catch {}
+  const was = JSON.stringify(r.prs);
+  r.prs = list;
+  if (was !== JSON.stringify(list) && R() === r) renderLeft();
+}
+const reviewMark = (pr) => (pr.reviewDecision === 'APPROVED' ? icon('check', 11, 'rv ok') : pr.reviewDecision === 'CHANGES_REQUESTED' ? icon('close', 11, 'rv chg') : null);
+function prBadge(r, branch) {
+  if (!S.settings.prs || !r.prs) return null;
+  const pr = r.prs.find((x) => x.headRefName === branch && !x.isCrossRepository);
+  if (!pr) return null;
+  return h('span', { class: 'prb', title: prTip(pr) + '\nClick to open on GitHub.', onclick: (e) => (e.stopPropagation(), api.openUrl(pr.url)), ondblclick: (e) => e.stopPropagation() }, h('i', { class: 'ckdot ' + prChecks(pr) }), '#' + pr.number, reviewMark(pr));
+}
+async function prCheckout(r, pr) {
+  const t = toast(`Checking out #${pr.number}…`, { spin: true });
+  const res = await api.gh(['pr', 'checkout', String(pr.number)], r.path);
+  if (res.code !== 0) (t.close(), gitError('Could not check out the pull request', res));
+  else t.done(`Checked out #${pr.number}`);
+  await refresh(r.path);
+}
+function prJump(r, pr) {
+  const d = r.data.refs;
+  const ref = d.locals.find((b) => b.name === pr.headRefName) || d.remotes.find((b) => b.short === pr.headRefName);
+  if (ref) selectSha(ref.sha, true);
+  else toast('That branch is not fetched yet. Fetch, or double-click to check the pull request out.');
+}
+function prMenu(e, r, pr) {
+  e.preventDefault();
+  menu(e.clientX, e.clientY, [
+    { label: `Check out #${pr.number}`, action: () => prCheckout(r, pr) },
+    { label: 'Open on GitHub', icon: 'pr', action: () => api.openUrl(pr.url) },
+    '-',
+    { label: 'Copy link', icon: 'copy', action: () => (api.copy(pr.url), toast('Copied the link')) },
+    { label: 'Copy branch name', icon: 'copy', action: () => (api.copy(pr.headRefName), toast('Copied ' + pr.headRefName)) },
+    ...ticketKeys(pr.headRefName + ' ' + pr.title, true).map((k) => ({ label: `Open ${k} in Jira`, action: () => openTicket(k) })),
+  ]);
+}
+
+// ---- optional (Preferences): ticket keys such as MOB-1234 in branch names and commit messages
+const TICKET_SKIP = new Set('UTF SHA ISO HTTP TLS SSL RFC CVE MD UTC AES RSA COVID IPV ES RELEASE FIX PR ISSUE BUG VERSION HOTFIX TEST STEP PART V'.split(' '));
+// loose: also accept lower-case keys, as branch names usually have them (mob-1234-fix-login).
+function ticketKeys(text, loose) {
+  if (!S.settings.tickets || !text) return [];
+  const want = (S.settings.ticketKeys || '').toUpperCase().split(/[\s,]+/).filter(Boolean);
+  const out = [];
+  for (const m of text.matchAll(/(?<![A-Za-z0-9])([A-Za-z][A-Za-z0-9]+)-(\d+)(?![A-Za-z0-9])/g)) {
+    const p = m[1].toUpperCase();
+    if (want.length) {
+      if (!want.includes(p) || (!loose && m[1] !== p)) continue;
+    } else {
+      if (TICKET_SKIP.has(p)) continue;
+      if (m[1] !== p && !(loose && m[1] === m[1].toLowerCase() && p.length <= 6 && m[2].length >= 3)) continue;
+    }
+    const k = p + '-' + m[2];
+    if (!out.includes(k)) out.push(k);
+  }
+  return out;
+}
+function openTicket(k) {
+  const base = (S.settings.jiraUrl || '').trim().replace(/\/+$/, '');
+  if (!/^https:\/\//.test(base)) return toast('Set your Jira address in Preferences to open tickets.');
+  api.openUrl(base + '/browse/' + k);
+}
+const ticketChip = (k) => h('button', { class: 'tkt', title: `Open ${k} in Jira`, onclick: (e) => (e.stopPropagation(), openTicket(k)) }, k);
+function ticketRow(r, c) {
+  const names = (r.refMap.get(c.sha) || []).map((g) => g.name).join(' ');
+  const keys = [...new Set([...ticketKeys(c.subject + '\n' + (c.body || '')), ...ticketKeys(names, true)])];
+  return keys.length ? h('div', { class: 'tktrow' }, keys.map(ticketChip)) : null;
+}
+const ticketPrefix = (k) => ({ colon: k + ': ', space: k + ' ' })[S.settings.ticketStyle] || `[${k}] `;
 
 function buildRefMap(d, path) {
   const m = new Map();
@@ -914,6 +1004,11 @@ async function settingsDialog() {
       { name: 'avatars', type: 'checkbox', label: 'Show author avatars (loads from Gravatar and GitHub)', value: s.avatars },
       { name: 'limit', type: 'number', label: 'Commits to load at a time', value: s.limit },
       { name: 'pullMode', type: 'select', label: 'Default pull action', value: s.pullMode, options: Object.entries(PULL).map(([value, p]) => ({ value, label: p.label })) },
+      { name: 'prs', type: 'checkbox', label: 'Pull requests: list open ones in the left panel and show checks and review state on branches (GitHub)', value: !!s.prs },
+      { name: 'tickets', type: 'checkbox', label: 'Ticket keys: link keys like MOB-1234 to Jira and offer them as a commit prefix', value: !!s.tickets },
+      { name: 'jiraUrl', label: 'Jira address', value: s.jiraUrl || '', placeholder: 'https://yourcompany.atlassian.net' },
+      { name: 'ticketKeys', label: 'Ticket prefixes (optional)', value: s.ticketKeys || '', placeholder: 'MOB, MLP — leave empty to detect any' },
+      { name: 'ticketStyle', type: 'select', label: 'Commit prefix style', value: s.ticketStyle || 'bracket', options: [{ value: 'bracket', label: '[MOB-1234] Summary' }, { value: 'colon', label: 'MOB-1234: Summary' }, { value: 'space', label: 'MOB-1234 Summary' }] },
       { name: 'forceNoAsk', type: 'checkbox', label: 'Force push and force delete without asking (a rejected push overwrites the remote branch; unmerged branches are deleted)', value: !!s.forceNoAsk },
     ],
     ok: 'Save',
@@ -923,6 +1018,12 @@ async function settingsDialog() {
   s.limit = Math.max(200, Math.min(20000, +v.limit || 2000));
   s.pullMode = v.pullMode;
   s.forceNoAsk = !!v.forceNoAsk;
+  s.prs = !!v.prs;
+  s.tickets = !!v.tickets;
+  s.jiraUrl = v.jiraUrl;
+  s.ticketKeys = v.ticketKeys;
+  s.ticketStyle = v.ticketStyle;
+  for (const x of repos.values()) (x.prsAt = 0), (x.rightSig = null);
   s.theme = v.theme;
   s.textSize = +v.textSize;
   applyAppearance();
@@ -1155,7 +1256,7 @@ function renderTree(r, node, depth, key, mkLeaf, out) {
   }
 }
 function section(r, key, title, ico, count, body) {
-  const open = r.open[key];
+  const open = key === 'prs' ? r.open[key] !== false : r.open[key];
   return [
     h(
       'div',
@@ -1231,6 +1332,7 @@ function renderLeft() {
       b.head ? h('span', { class: 'cb' }, icon('check', 12)) : null,
       icon('branch', 14),
       h('span', { class: 'nm' }, name),
+      prBadge(r, b.name),
       b.ahead || b.behind ? h('span', { class: 'ab' }, [b.ahead ? cap(b.ahead) + '↑' : '', b.behind ? cap(b.behind) + '↓' : ''].filter(Boolean).join(' ')) : null,
       eyeBtn(r, { local: b })
     );
@@ -1247,6 +1349,7 @@ function renderLeft() {
       },
       icon('branch', 14),
       h('span', { class: 'nm' }, name),
+      prBadge(r, b.short),
       eyeBtn(r, { remote: b })
     );
 
@@ -1256,7 +1359,7 @@ function renderLeft() {
   const stashes = d.stashes.filter((s) => match(s.msg));
   const forceOpen = !!q;
   const saved = { ...r.open };
-  if (forceOpen) r.open = { local: true, remote: true, tags: true, stashes: true };
+  if (forceOpen) r.open = { local: true, remote: true, tags: true, stashes: true, prs: true };
 
   const scrolls = Object.fromEntries([...box.querySelectorAll('.secbody')].map((el) => [el.dataset.key, el.scrollTop]));
   put(box, 
@@ -1300,6 +1403,21 @@ function renderLeft() {
       }
       return out.length ? out : [h('div', { class: 'empty' }, 'No remotes')];
     }),
+    ...(!S.settings.prs || !r.prs ? [] : section(r, 'prs', 'PULL REQUESTS', 'pr', r.prs.filter((x) => match(`#${x.number} ${x.title} ${x.headRefName}`)).length, () => {
+      const list = r.prs.filter((x) => match(`#${x.number} ${x.title} ${x.headRefName}`));
+      return list.length
+        ? list.map((pr) =>
+            h(
+              'div',
+              { class: 'ritem pritem' + (pr.isDraft ? ' draft' : '') + (pr.headRefName === d.head.branch ? ' mine' : ''), style: { paddingLeft: '30px' }, title: prTip(pr) + '\nClick to find the branch in the graph. Double-click to check it out.', onclick: () => prJump(r, pr), ondblclick: () => prCheckout(r, pr), oncontextmenu: (e) => prMenu(e, r, pr) },
+              h('i', { class: 'ckdot ' + prChecks(pr) }),
+              h('span', { class: 'prn' }, '#' + pr.number),
+              h('span', { class: 'nm' }, pr.title),
+              reviewMark(pr)
+            )
+          )
+        : [h('div', { class: 'empty' }, 'No open pull requests')];
+    })),
     ...(!d.refs.tags.length ? [] : section(r, 'tags', 'TAGS', 'tag', tags.length, () =>
       tags.length
         ? tags.map((t) =>
@@ -1492,6 +1610,8 @@ function refMenu(e, g, fromLeft) {
   }
   if (hiddenOf(r.path).length) items.push({ label: 'Show everything hidden', icon: 'eye', action: () => ((S.hidden[r.path] = []), setHidden(r, [], false)) });
   const refSha = (g.local || g.remote || g.tag).sha;
+  const tks = ticketKeys(g.name, true);
+  if (tks.length) items.push('-', ...tks.map((k) => ({ label: `Open ${k} in Jira`, action: () => openTicket(k) })));
   items.push(
     '-',
     { label: g.tag ? 'Copy tag name' : 'Copy branch name', icon: 'copy', action: () => (api.copy(target), toast('Copied ' + target)) },
@@ -2158,6 +2278,22 @@ function renderWip(r, box) {
         }),
         'Amend previous commit'
       ),
+        (() => {
+          const k = ticketKeys(d.head.branch || '', true)[0];
+          return k
+            ? h('button', {
+                class: 'mini tktfill',
+                title: `Start the commit summary with ${ticketPrefix(k).trim()} (from the branch name)`,
+                onclick: () => {
+                  if (m.summary.includes(k)) return $('csum').focus();
+                  m.summary = ticketPrefix(k) + m.summary;
+                  $('csum').value = m.summary;
+                  $('csum').dispatchEvent(new Event('input'));
+                  $('csum').focus();
+                },
+              }, ticketPrefix(k).trim())
+            : null;
+        })(),
         h('button', {
           class: 'mini clearmsg',
           title: 'Clear the commit summary and description',
@@ -2247,7 +2383,7 @@ function renderCommit(r, box, c, files) {
       c.stash ? 'stash: ' : 'commit: ',
       h('span', { class: 'sha', title: 'Click to copy the full SHA', onclick: () => (api.copy(c.sha), toast('Copied ' + short(c.sha))) }, short(c.sha))
     ),
-    h('div', { class: 'cdmsg' }, h('div', { class: 's' }, c.subject), c.body ? h('div', { class: 'b' }, reflow(c.body)) : null),
+    h('div', { class: 'cdmsg' }, h('div', { class: 's' }, c.subject), c.body ? h('div', { class: 'b' }, reflow(c.body)) : null, ticketRow(r, c)),
     c.stash ? null : h(
       'div',
       { class: 'cdauthor' },
@@ -2789,6 +2925,6 @@ async function init() {
     for (const p of INFO.devOpen.split(':')) await openRepo(p, { quiet: true });
   } else activate(S.active);
  wireDrops();
-  window.__app = { openHistory, histPick, setHidden, isHidden, loadPr, autoPullRun, autoPullDialog, autoState, applyAppearance, editProfile, moveTab, openMany, columnsMenu, applyGraphSettings, S: () => S, R, repos, openRepo, selectSha, openDiff, refresh, squash, squashable, headChain, cloneDialog, profileMenu, commitMenu, activate, checkout, cherryPick, resetTo, stash, pop, mergeInto, rebaseOnto, undo, redo, stage, unstage, stageAll, doCommit, switchProfile, applyHunk, push, pull, createBranch, G };
+  window.__app = { ticketKeys, loadPrList, prChecks, settingsDialog, renderLeft, renderRight, openHistory, histPick, setHidden, isHidden, loadPr, autoPullRun, autoPullDialog, autoState, applyAppearance, editProfile, moveTab, openMany, columnsMenu, applyGraphSettings, S: () => S, R, repos, openRepo, selectSha, openDiff, refresh, squash, squashable, headChain, cloneDialog, profileMenu, commitMenu, activate, checkout, cherryPick, resetTo, stash, pop, mergeInto, rebaseOnto, undo, redo, stage, unstage, stageAll, doCommit, switchProfile, applyHunk, push, pull, createBranch, G };
 }
 init();
