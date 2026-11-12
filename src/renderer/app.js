@@ -79,6 +79,7 @@ async function refresh(path, { statusOnly = false } = {}) {
       const first = !r.data;
       r.data = await G.loadRepo(path, r.limit, r.data, hiddenOf(path));
       if (first && r.data.gitDir) api.watch(path, r.data.gitDir);
+      if (first && S.settings.avatars) loadRemoteIcons(r);
       if (first && S.settings.avatars) {
         G.githubAvatars(path).then((found) => {
           const fresh = Object.entries(found).filter(([e, u]) => S.avatarMap[e] !== u);
@@ -146,6 +147,37 @@ async function rebuild(r) {
     else r.view = null;
   }
   loadPr(r);
+}
+
+// GitHub remotes show the owner's picture (the org or user logo) instead of a globe.
+async function loadRemoteIcons(r) {
+  r.remoteIcons = {};
+  for (const name of r.data.remotes) {
+    const res = await G.git(r.path, ['remote', 'get-url', name]);
+    const m = /github\.com[:/]([^/\s]+)\//.exec(res.stdout || '');
+    if (m) r.remoteIcons[name] = `https://github.com/${encodeURIComponent(m[1])}.png?size=40`;
+  }
+  if (!Object.keys(r.remoteIcons).length) return;
+  r.version++;
+  if (R() === r) {
+    renderGraph();
+    renderLeft();
+  }
+}
+function remoteIcon(r, remote, size, cls) {
+  const el = icon('globe', size, cls);
+  const url = r.remoteIcons && r.remoteIcons[remote];
+  if (url) {
+    const img = h('img', { src: url, draggable: 'false' });
+    img.addEventListener('error', () => {
+      delete r.remoteIcons[remote];
+      el.classList.remove('hasimg');
+      img.remove();
+    });
+    el.classList.add('hasimg');
+    el.append(img);
+  }
+  return el;
 }
 
 // ---- hide in graph: refs the user chose to leave out of the graph, per repository.
@@ -1240,7 +1272,7 @@ function renderLeft() {
                 renderLeft();
               },
             },
-            icon('globe', 15),
+            remoteIcon(r, rem, 15, 'remico'),
             h('span', { class: 'nm' }, rem)
           )
         );
@@ -1272,7 +1304,7 @@ function renderLeft() {
           )
         : [h('div', { class: 'empty' }, 'No tags')]
     )),
-    ...section(r, 'stashes', 'STASHES', 'box', stashes.length, () =>
+    ...(!d.stashes.length ? [] : section(r, 'stashes', 'STASHES', 'box', stashes.length, () =>
       stashes.length
         ? stashes.map((s) =>
             h(
@@ -1283,8 +1315,10 @@ function renderLeft() {
             )
           )
         : [h('div', { class: 'empty' }, 'No stashes')]
-    )
+    ))
   );
+  // An open section never collapses below a few rows, however long its neighbours are.
+  for (const el of box.querySelectorAll('.secbody')) el.style.minHeight = Math.min(el.scrollHeight, 124) + 'px';
   if (forceOpen) r.open = saved;
   if (box.dataset.path === r.path) for (const el of box.querySelectorAll('.secbody')) el.scrollTop = scrolls[el.dataset.key] || 0;
   box.dataset.path = r.path;
@@ -1454,7 +1488,7 @@ function refLabel(g) {
     g.head ? icon('check', 12) : null,
     h('span', { class: 'nm' }, g.name),
     g.local ? icon('laptop', 13) : null,
-    g.remote ? icon('globe', 12, 'rico') : null,
+    g.remote ? remoteIcon(R(), g.remote.remote, 12, 'rico') : null,
     g.tag ? icon('tag', 13) : null
   );
 }
