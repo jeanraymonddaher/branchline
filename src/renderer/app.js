@@ -2168,60 +2168,128 @@ async function applyHunk(d, hk, kind) {
   R().diffSig = null;
   await run(args, { stdin: G.hunkPatch(d, hk) });
 }
+const diffOpts = () => ({ view: 'hunk', layout: 'inline', wrap: false, ws: false, ...(S.settings.diff || {}) });
+function setDiffOpt(key, val) {
+  S.settings.diff = { ...diffOpts(), [key]: val };
+  save();
+  const r = R();
+  if (r) r.diffSig = null;
+  renderDiff();
+}
+// Jump to the next or previous block of changed lines.
+function jumpChange(dir) {
+  const body = document.querySelector('#diff .dbody');
+  if (!body) return;
+  const tops = [...body.querySelectorAll('.chg')].map((el) => el.offsetTop);
+  const at = body.scrollTop + 40;
+  const next = dir > 0 ? tops.find((t) => t > at + 4) : [...tops].reverse().find((t) => t < at - 4);
+  if (next != null) body.scrollTop = Math.max(0, next - 40);
+}
 async function renderDiff() {
   const r = R();
   const v = r.view;
   const box = $('diff');
-  const sig = JSON.stringify([r.path, v.mode, v.sha, v.file.path, v.file.status, r.data.status.raw]);
+  const o = diffOpts();
+  const sig = JSON.stringify([r.path, v.mode, v.sha, v.file.path, v.file.status, r.data.status.raw, o]);
   if (sig === r.diffSig && box.dataset.sig === sig) return;
   r.diffSig = sig;
-  const text = await G.fileDiff(r.path, v.file, v.mode, v.mode === 'commit' ? v.range || r.bySha.get(v.sha) : null);
+  const full = o.view === 'full';
+  const text = await G.fileDiff(r.path, v.file, v.mode, v.mode === 'commit' ? v.range || r.bySha.get(v.sha) : null, { full, ws: o.ws });
   if (R() !== r || r.view !== v) return;
+  const sameFile = box.dataset.file === v.mode + v.sha + v.file.path;
+  const keepScroll = sameFile && box.dataset.view === o.view ? box.querySelector('.dbody')?.scrollTop : null;
   box.dataset.sig = sig;
+  box.dataset.file = v.mode + v.sha + v.file.path;
+  box.dataset.view = o.view;
   const d = G.parseDiff(text);
   const f = v.file;
-  const canHunk = v.mode !== 'commit' && f.status !== '?' && f.status !== 'U' && !d.binary;
+  // Staging a hunk needs the real patch: not the whole-file view, and not one with whitespace ignored.
+  const canHunk = !full && !o.ws && v.mode !== 'commit' && f.status !== '?' && f.status !== 'U' && !d.binary;
+  const split = o.layout === 'split';
   const inner = h('div', { class: 'inner' });
   let count = 0;
-  const MAX = 6000;
+  let changes = 0;
+  const MAX = full ? 20000 : 6000;
   if (d.binary) inner.append(h('div', { class: 'dnote' }, 'Binary file — no text diff to show.'));
-  else if (!d.hunks.length) inner.append(h('div', { class: 'dnote' }, text.trim() ? 'No content changes (mode or rename only).' : 'No changes to show.'));
+  else if (!d.hunks.length) inner.append(h('div', { class: 'dnote' }, text.trim() ? 'No content changes (mode or rename only).' : o.ws ? 'Only whitespace changed.' : 'No changes to show.'));
+  const cell = (cls, num, txt) => [h('span', { class: 'ln ' + cls }, num == null ? '' : String(num)), h('span', { class: 'tx ' + cls }, txt == null ? '' : txt)];
   for (const hk of d.hunks) {
     if (count > MAX) break;
-    inner.append(
-      h(
-        'div',
-        { class: 'hunkh' },
-        h('span', {}, hk.header),
-        h('span', { class: 'sp' }),
-        canHunk && v.mode === 'unstaged' ? h('button', { class: 'mini red', onclick: () => applyHunk(d, hk, 'discard') }, 'Discard Hunk') : null,
-        canHunk && v.mode === 'unstaged' ? h('button', { class: 'mini green', onclick: () => applyHunk(d, hk, 'stage') }, 'Stage Hunk') : null,
-        canHunk && v.mode === 'staged' ? h('button', { class: 'mini red', onclick: () => applyHunk(d, hk, 'unstage') }, 'Unstage Hunk') : null
-      )
-    );
-    let o = hk.o;
-    let n = hk.n;
-    const frag = document.createDocumentFragment();
-    for (const l of hk.lines) {
-      if (++count > MAX) {
-        frag.append(h('div', { class: 'dnote' }, 'Diff truncated — this file is very large.'));
-        break;
-      }
-      const ch = l[0];
-      const cls = ch === '+' ? 'add' : ch === '-' ? 'del' : ch === '\\' ? 'meta' : '';
-      frag.append(
+    if (!full)
+      inner.append(
         h(
           'div',
-          { class: 'dl ' + cls },
-          h('span', { class: 'ln' }, ch === '+' || ch === '\\' ? '' : String(o++)),
-          h('span', { class: 'ln' }, ch === '-' || ch === '\\' ? '' : String(n++)),
-          h('span', { class: 'tx' }, ch === '\\' ? l : (ch === '+' || ch === '-' ? ch : ' ') + ' ' + l.slice(1))
+          { class: 'hunkh' },
+          h('span', {}, hk.header),
+          h('span', { class: 'sp' }),
+          canHunk && v.mode === 'unstaged' ? h('button', { class: 'mini red', onclick: () => applyHunk(d, hk, 'discard') }, 'Discard Hunk') : null,
+          canHunk && v.mode === 'unstaged' ? h('button', { class: 'mini green', onclick: () => applyHunk(d, hk, 'stage') }, 'Stage Hunk') : null,
+          canHunk && v.mode === 'staged' ? h('button', { class: 'mini red', onclick: () => applyHunk(d, hk, 'unstage') }, 'Unstage Hunk') : null
         )
       );
+    let ol = hk.o;
+    let nl = hk.n;
+    const frag = document.createDocumentFragment();
+    let inChange = false;
+    const mark = (isChange) => {
+      const start = isChange && !inChange;
+      if (start) changes++;
+      inChange = isChange;
+      return start ? ' chg' : '';
+    };
+    if (split) {
+      // Pair each run of removed lines with the added lines that follow it.
+      const L = hk.lines;
+      for (let i = 0; i < L.length && count <= MAX; ) {
+        const ch = L[i][0];
+        if (ch === '\\') {
+          i++;
+          continue;
+        }
+        if (ch !== '-' && ch !== '+') {
+          count++;
+          frag.append(h('div', { class: 'sl' + mark(false) }, cell('', ol++, L[i].slice(1)), cell('', nl++, L[i].slice(1))));
+          i++;
+          continue;
+        }
+        const dels = [];
+        const adds = [];
+        while (i < L.length && L[i][0] === '-') dels.push(L[i++].slice(1));
+        while (i < L.length && (L[i][0] === '+' || L[i][0] === '\\')) L[i][0] === '+' ? adds.push(L[i++].slice(1)) : i++;
+        for (let k = 0; k < Math.max(dels.length, adds.length); k++) {
+          count++;
+          frag.append(
+            h(
+              'div',
+              { class: 'sl' + mark(true) },
+              k < dels.length ? cell('del', ol++, dels[k]) : cell('nil'),
+              k < adds.length ? cell('add', nl++, adds[k]) : cell('nil')
+            )
+          );
+        }
+      }
+    } else {
+      for (const l of hk.lines) {
+        if (++count > MAX) break;
+        const ch = l[0];
+        const cls = ch === '+' ? 'add' : ch === '-' ? 'del' : ch === '\\' ? 'meta' : '';
+        frag.append(
+          h(
+            'div',
+            { class: 'dl ' + cls + (ch === '\\' ? '' : mark(ch === '+' || ch === '-')) },
+            h('span', { class: 'ln' }, ch === '+' || ch === '\\' ? '' : String(ol++)),
+            h('span', { class: 'ln' }, ch === '-' || ch === '\\' ? '' : String(nl++)),
+            h('span', { class: 'tx' }, ch === '\\' ? l : (ch === '+' || ch === '-' ? ch : ' ') + ' ' + l.slice(1))
+          )
+        );
+      }
     }
+    if (count > MAX) frag.append(h('div', { class: 'dnote' }, 'Diff truncated — this file is very large.'));
     inner.append(frag);
   }
-  const body = h('div', { class: 'dbody' }, inner);
+  const body = h('div', { class: 'dbody' + (split ? ' split' : '') + (o.wrap ? ' wrap' : '') }, inner);
+  const seg = (key, opts) => h('div', { class: 'vtoggle dseg' }, opts.map(([val, label, tip]) => h('button', { class: o[key] === val ? 'on' : '', title: tip, onclick: () => setDiffOpt(key, val) }, label)));
+  const tog = (key, label, tip) => h('button', { class: 'dtog' + (o[key] ? ' on' : ''), title: tip, onclick: () => setDiffOpt(key, !o[key]) }, label);
   put(box, 
     h(
       'div',
@@ -2233,8 +2301,32 @@ async function renderDiff() {
       v.mode === 'staged' ? h('button', { class: 'mini red', onclick: () => unstage([f]) }, 'Unstage File') : null,
       h('button', { class: 'iconbtn', title: 'Close (Esc)', onclick: closeDiff }, icon('close', 16))
     ),
+    h(
+      'div',
+      { class: 'dtools' },
+      seg('view', [
+        ['hunk', 'Hunks', 'Show only the changed parts'],
+        ['full', 'Whole file', 'Show the whole file with the changes in place'],
+      ]),
+      seg('layout', [
+        ['inline', 'Inline', 'Old and new lines in one column'],
+        ['split', 'Split', 'Old on the left, new on the right'],
+      ]),
+      tog('wrap', 'Wrap', 'Wrap long lines'),
+      tog('ws', 'Ignore whitespace', 'Hide changes that are only spaces or tabs'),
+      h('span', { class: 'sp' }),
+      h('span', { class: 'dcount' }, d.binary ? '' : plural(changes, 'change')),
+      h('button', { class: 'iconbtn', title: 'Previous change', disabled: !changes, onclick: () => jumpChange(-1) }, icon('chevUp', 14)),
+      h('button', { class: 'iconbtn', title: 'Next change', disabled: !changes, onclick: () => jumpChange(1) }, icon('chevDown', 14))
+    ),
     body
   );
+  if (keepScroll != null) body.scrollTop = keepScroll;
+  else if (full) {
+    // Open the whole-file view at the first change rather than at line 1.
+    const first = body.querySelector('.chg');
+    if (first) body.scrollTop = Math.max(0, first.offsetTop - 80);
+  }
 }
 
 // ------------------------------------------------------------ top-level render

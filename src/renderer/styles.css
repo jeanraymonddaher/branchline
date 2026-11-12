@@ -537,3 +537,22 @@ body.resizing * { user-select: none !important; }
 .ico.hasimg svg { visibility: hidden; }
 .ico.hasimg img { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 3px; object-fit: cover; }
 .lbl .rico.hasimg { padding: 0; width: 15px; height: 15px; background: #fff; }
+
+/* ---- diff options bar, split view, wrap ---- */
+.dtools { display: flex; align-items: center; gap: 8px; padding: 5px 10px; background: var(--bg1); border-bottom: 1px solid var(--line); flex: none; font-size: calc(12.5px + var(--fz)); }
+.dtools .sp { flex: 1; }
+.dtools .dseg { margin: 0; }
+.dtools .dseg button { padding: 2px 9px; }
+.dtog { background: var(--bg1); border: 1px solid var(--line2); border-radius: 3px; padding: 2px 9px; }
+.dtog.on { background: var(--selbg); color: var(--seltext); border-color: var(--selbg); }
+.dtog:hover, .dtools .dseg button:hover { filter: brightness(1.15); }
+.dcount { color: var(--dim); }
+.dtools .iconbtn { padding: 3px; }
+.dbody.wrap .inner, .dbody.split .inner { min-width: 0; }
+.dbody.wrap .dl { white-space: pre-wrap; word-break: break-all; }
+.sl { display: grid; grid-template-columns: 48px minmax(0, 1fr) 48px minmax(0, 1fr); white-space: pre-wrap; word-break: break-all; }
+.sl .ln { text-align: right; padding-right: 8px; color: var(--faint); user-select: none; background: var(--lnbg); }
+.sl .tx { padding: 0 10px; border-right: 1px solid var(--line); min-height: 18px; }
+.sl .tx.del { background: var(--delbg); color: var(--deltx); } .sl .ln.del { background: var(--delbg); }
+.sl .tx.add { background: var(--addbg); color: var(--addtx); } .sl .ln.add { background: var(--addbg); }
+.sl .nil { background: var(--lnbg); }

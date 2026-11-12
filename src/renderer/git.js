@@ -149,18 +149,20 @@ export async function commitFiles(path, c) {
     });
 }
 
-export async function fileDiff(path, file, mode, commit) {
+export async function fileDiff(path, file, mode, commit, opts = {}) {
+  // full: the whole file as context. ws: ignore whitespace changes.
+  const x = [...(opts.full ? ['-U100000'] : []), ...(opts.ws ? ['-w'] : [])];
   let args;
   if (mode === 'commit') {
     args = commit.parents.length
-      ? ['diff', '-M', commit.parents[0], commit.sha, '--', file.path, ...(file.orig ? [file.orig] : [])]
-      : ['show', '--format=', commit.sha, '--', file.path];
+      ? ['diff', ...x, '-M', commit.parents[0], commit.sha, '--', file.path, ...(file.orig ? [file.orig] : [])]
+      : ['show', ...x, '--format=', commit.sha, '--', file.path];
   } else if (mode === 'staged') {
-    args = ['diff', '--cached', '-M', '--', file.path, ...(file.orig ? [file.orig] : [])];
+    args = ['diff', ...x, '--cached', '-M', '--', file.path, ...(file.orig ? [file.orig] : [])];
   } else if (file.status === '?') {
-    args = ['diff', '--no-index', '--', '/dev/null', file.path];
+    args = ['diff', ...x, '--no-index', '--', '/dev/null', file.path];
   } else {
-    args = ['diff', '--', file.path];
+    args = ['diff', ...x, '--', file.path];
   }
   const r = await git(path, args, NOLOCK);
   return r.stdout;
