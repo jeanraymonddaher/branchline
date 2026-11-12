@@ -19,7 +19,7 @@ let S = {
   cloneDir: null,
   avatarMap: {},
   autoPull: {},
-  settings: { avatars: true, limit: 2000, pullMode: 'ff', fileView: 'path', theme: 'dark', textSize: -1, refW: 150, graphW: null, compact: false, smart: false, cols: { ref: true, graph: true, msg: true, author: false, date: false, sha: false } },
+  settings: { avatars: true, limit: 2000, pullMode: 'ff', fileView: 'path', leftCollapsed: false, theme: 'dark', textSize: -1, refW: 150, graphW: null, compact: false, smart: false, cols: { ref: true, graph: true, msg: true, author: false, date: false, sha: false } },
 };
 const repos = new Map();
 const save = debounce(() => api.storeSave(S), 250);
@@ -1022,7 +1022,23 @@ function renderLeft() {
   const d = r.data;
   const q = $('filter').value.trim().toLowerCase();
   const match = (name) => !q || name.toLowerCase().includes(q);
-  put($('viewing'), icon('commit', 14), h('span', {}, 'Viewing ', h('b', {}, String(d.commits.length))));
+  const setCollapsed = (on, openKey) => {
+    S.settings.leftCollapsed = on;
+    if (openKey) r.open[openKey] = true;
+    save();
+    renderLeft();
+    renderGraph();
+  };
+  put($('viewing'), icon('commit', 14), h('span', {}, 'Viewing ', h('b', {}, String(d.commits.length))), h('span', { style: { flex: '1' } }), h('button', { class: 'iconbtn lcollapse', title: 'Collapse the left panel', onclick: () => setCollapsed(true) }, icon('chevLeft', 13)));
+  $('left').classList.toggle('collapsed', !!S.settings.leftCollapsed);
+  const railItem = (key, ico, n, label) => h('div', { class: 'railitem', title: `${n} ${label}`, onclick: () => setCollapsed(false, key) }, icon(ico, 20), h('span', {}, String(n)));
+  put($('lrail'),
+    h('button', { class: 'railexp', title: 'Expand the left panel', onclick: () => setCollapsed(false) }, icon('chevRight', 12)),
+    railItem('local', 'laptop', d.refs.locals.length, 'local branches'),
+    railItem('remote', 'cloud', d.refs.remotes.length, 'remote branches'),
+    d.refs.tags.length ? railItem('tags', 'tag', d.refs.tags.length, 'tags') : null,
+    d.stashes.length ? railItem('stashes', 'box', d.stashes.length, 'stashes') : null
+  );
   const jump = (sha) => selectSha(sha, true);
 
   const localLeaf = (b, name, pad) =>

@@ -406,3 +406,18 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent); }
 .imgprev img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .iconbtn.has-update { color: var(--accent); position: relative; }
 .updot { position: absolute; top: 4px; right: 4px; width: 7px; height: 7px; border-radius: 50%; background: var(--green); }
+
+/* ---- collapsed left panel ---- */
+#lrail { display: none; flex-direction: column; align-items: center; gap: 12px; padding-top: 10px; }
+#left.collapsed { width: 46px; }
+#left.collapsed > :not(#lrail) { display: none; }
+#left.collapsed #lrail { display: flex; }
+.railexp { width: 20px; height: 20px; border-radius: 50%; border: none; background: var(--text); color: var(--bg1); display: inline-flex; align-items: center; justify-content: center; padding: 0; }
+.railexp:hover { background: var(--bright); }
+.railitem { display: flex; flex-direction: column; align-items: center; gap: 1px; width: 100%; padding: 3px 0; color: var(--text); }
+.railitem span:last-child { color: var(--accent); font-size: calc(12px + var(--fz)); }
+.railitem:hover { background: var(--hover); color: var(--bright); }
+.lcollapse { padding: 2px; color: var(--dim); }
+#viewing { padding-right: 8px; }
+/* keep the repo and branch names clear of the centred toolbar buttons in narrow windows */
+.crumb { max-width: min(300px, calc((50vw - 200px) / 2)); min-width: 0; }

@@ -30,6 +30,7 @@ const ICONS = {
   close: P('M4 4l8 8M12 4l-8 8'),
   chevDown: P('M4 6l4 4 4-4'),
   chevRight: P('M6 4l4 4-4 4'),
+  chevLeft: P('M10 4L6 8l4 4'),
   undo: P('M4 7h5.5a3.5 3.5 0 010 7H7M4 7l3-3M4 7l3 3'),
   redo: P('M12 7H6.5a3.5 3.5 0 000 7H9M12 7l-3-3M12 7l-3 3'),
   pull: P('M8 2v8M4.5 6.5L8 10l3.5-3.5M3 13.5h10'),
