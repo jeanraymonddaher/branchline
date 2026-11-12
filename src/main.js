@@ -1,4 +1,6 @@
-const { app, BrowserWindow, ipcMain, dialog, shell, Menu, clipboard } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, Menu, clipboard, net } = require('electron');
+const { Readable } = require('stream');
+const { pipeline } = require('stream/promises');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -119,18 +121,15 @@ ipcMain.handle('reveal', (e, file) => shell.showItemInFolder(file));
 ipcMain.handle('copy', (e, text) => clipboard.writeText(String(text)));
 ipcMain.handle('info', () => ({ version: app.getVersion(), home: os.homedir(), devOpen: DEV ? process.env.BL_OPEN || null : null }));
 
-// ---- updates: releases live on GitHub; download and swap the app with the gh CLI.
+// ---- updates: releases live on GitHub; download the DMG and swap the app.
 const REPO = 'jeanraymonddaher/branchline';
-const ghRun = (args, env = {}) =>
-  new Promise((resolve) => {
-    execFile('gh', args, { env: { ...process.env, PATH: envPath, GH_PROMPT_DISABLED: '1', ...env }, maxBuffer: 16 * 1024 * 1024 }, (err, stdout, stderr) =>
-      resolve({ code: err ? (typeof err.code === 'number' ? err.code : -1) : 0, stdout: stdout || '', stderr: stderr || (err ? String(err.message) : '') })
-    );
-  });
-// When gh has several accounts, use the one that owns the repo rather than the active one.
-async function updateEnv() {
-  const t = await ghRun(['auth', 'token', '--user', REPO.split('/')[0]]);
-  return t.code === 0 && t.stdout.trim() ? { GH_TOKEN: t.stdout.trim() } : {};
+// The repo is public, so the check and download need no sign-in.
+async function latestRelease() {
+  const res = await net.fetch(`https://api.github.com/repos/${REPO}/releases/latest`, { headers: { 'User-Agent': 'Branchline', Accept: 'application/vnd.github+json' } });
+  if (!res.ok) throw new Error(`GitHub answered ${res.status}`);
+  const rel = await res.json();
+  const asset = (rel.assets || []).find((x) => x.name.endsWith('.dmg'));
+  return { version: String(rel.tag_name).replace(/^v/, ''), url: asset && asset.browser_download_url, name: asset && asset.name };
 }
 function isNewer(a, b) {
   const pa = a.split('.').map(Number);
@@ -141,20 +140,15 @@ function isNewer(a, b) {
 let updating = false;
 async function checkForUpdates(manual) {
   if (updating) return;
-  const env = await updateEnv();
-  const r = await ghRun(['release', 'view', '--repo', REPO, '--json', 'tagName'], env);
-  if (r.code !== 0) {
-    if (manual)
-      dialog.showMessageBox(win, {
-        type: 'warning',
-        message: 'Could not check for updates',
-        detail: /ENOENT/.test(r.stderr) ? 'The GitHub CLI is not installed. Run: brew install gh && gh auth login' : r.stderr.trim().slice(0, 400),
-      });
+  let rel;
+  try {
+    rel = await latestRelease();
+  } catch (e) {
+    if (manual) dialog.showMessageBox(win, { type: 'warning', message: 'Could not check for updates', detail: String(e.message).slice(0, 400) });
     return;
   }
-  const tag = JSON.parse(r.stdout).tagName;
-  const latest = tag.replace(/^v/, '');
-  if (!isNewer(latest, app.getVersion())) {
+  const latest = rel.version;
+  if (!rel.url || !isNewer(latest, app.getVersion())) {
     if (manual) dialog.showMessageBox(win, { message: 'Branchline is up to date', detail: `Version ${app.getVersion()} is the latest.` });
     return;
   }
@@ -165,17 +159,20 @@ async function checkForUpdates(manual) {
     defaultId: 0,
     cancelId: 1,
   });
-  if (response === 0) installUpdate(tag, env);
+  if (response === 0) installUpdate(rel);
 }
-async function installUpdate(tag, env) {
+async function installUpdate(rel) {
   if (DEV) return dialog.showMessageBox(win, { message: 'Running from source', detail: 'Updates only install into the packaged app.' });
   updating = true;
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'branchline-update-'));
-  const d = await ghRun(['release', 'download', tag, '--repo', REPO, '--pattern', '*.dmg', '--dir', dir], env);
-  const dmg = fs.readdirSync(dir).find((f) => f.endsWith('.dmg'));
-  if (d.code !== 0 || !dmg) {
+  const dmg = rel.name;
+  try {
+    const res = await net.fetch(rel.url, { headers: { 'User-Agent': 'Branchline' } });
+    if (!res.ok) throw new Error(`GitHub answered ${res.status}`);
+    await pipeline(Readable.fromWeb(res.body), fs.createWriteStream(path.join(dir, dmg)));
+  } catch (e) {
     updating = false;
-    return dialog.showMessageBox(win, { type: 'warning', message: 'Update download failed', detail: d.stderr.trim().slice(0, 400) });
+    return dialog.showMessageBox(win, { type: 'warning', message: 'Update download failed', detail: String(e.message).slice(0, 400) });
   }
   const target = path.resolve(process.execPath, '..', '..', '..');
   const script = path.join(dir, 'swap.sh');

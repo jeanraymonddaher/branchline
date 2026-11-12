@@ -4,15 +4,15 @@ A dark, graph-first Git client for macOS with profile switching. It drives the `
 
 ## Install on another Mac
 
-Needs the GitHub CLI signed in to the account that owns this repo (`brew install gh && gh auth login`). Then run:
+Paste this into Terminal:
 
 ```
-gh api repos/jeanraymonddaher/branchline/contents/scripts/install.sh -H "Accept: application/vnd.github.raw" | bash
+curl -fsSL https://raw.githubusercontent.com/jeanraymonddaher/branchline/main/scripts/install.sh | bash
 ```
 
 This downloads the latest release, puts Branchline in Applications and opens it. The app is not notarized; the script clears the macOS quarantine flag so it opens normally.
 
-Also needs `git` (Xcode command line tools).
+Needs `git` (Xcode command line tools). Cloning from the GitHub list also needs the GitHub CLI signed in (`brew install gh && gh auth login`).
 
 ## Updates
 

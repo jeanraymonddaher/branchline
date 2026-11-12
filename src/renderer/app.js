@@ -18,7 +18,7 @@ let S = {
   recent: [],
   cloneDir: null,
   avatarMap: {},
-  settings: { avatars: true, limit: 2000, pullMode: 'ff', refW: 150, graphW: null, compact: false, smart: false, cols: { ref: true, graph: true, msg: true, author: false, date: false, sha: false } },
+  settings: { avatars: true, limit: 2000, pullMode: 'ff', fileView: 'path', refW: 150, graphW: null, compact: false, smart: false, cols: { ref: true, graph: true, msg: true, author: false, date: false, sha: false } },
 };
 const repos = new Map();
 const save = debounce(() => api.storeSave(S), 250);
@@ -40,7 +40,6 @@ function newRepo(path) {
     undo: [],
     redo: [],
     msg: { summary: '', desc: '', amend: false },
-    fileView: 'path',
     open: { local: true, remote: true, tags: true, stashes: true },
     folders: {},
     files: new Map(),
@@ -793,6 +792,7 @@ function cloneDialog() {
 function tbtn(ico, title, action, disabled) {
   return h('button', { class: 'iconbtn', title, disabled: !!disabled, onclick: action }, icon(ico, 20));
 }
+const dirtyCount = (d) => d.status.staged.length + d.status.unstaged.length + d.status.conflicted.length;
 function renderToolbar() {
   const r = R();
   const bar = $('toolbar');
@@ -865,10 +865,8 @@ function renderToolbar() {
       ),
       tbtn('push', 'Push', () => push()),
       tbtn('branch', 'Create branch', () => createBranch()),
-      tbtn('stash', 'Stash', stash),
-      tbtn('pop', 'Pop stash', pop, !d.stashes.length),
-      h('span', { class: 'tsep' }),
-      tbtn('terminal', 'Open in Terminal', () => api.terminal(r.path))
+      tbtn('stash', dirtyCount(d) ? 'Stash' : 'Nothing to stash', stash, !dirtyCount(d)),
+      tbtn('pop', 'Pop stash', pop, !d.stashes.length)
     ),
     h('div', { class: 'tright' }, tbtn('refresh', 'Fetch all', fetchAll), tbtn('search', 'Search commits (⌘F)', () => toggleSearch(true)))
   );
@@ -1525,7 +1523,7 @@ function fileRow(r, f, mode, label, pad) {
   );
 }
 function fileList(r, files, mode) {
-  if (r.fileView === 'path') return files.map((f) => fileRow(r, f, mode));
+  if (S.settings.fileView === 'path') return files.map((f) => fileRow(r, f, mode));
   const out = [];
   const walk = (node, depth) => {
     for (const [name, n] of [...node.dirs].sort((a, b) => a[0].localeCompare(b[0]))) {
@@ -1568,7 +1566,8 @@ async function appendIgnore(r, p) {
 
 function viewToggle(r) {
   const set = (v) => () => {
-    r.fileView = v;
+    S.settings.fileView = v;
+    save();
     r.rightSig = null;
     renderRight();
   };
@@ -1578,8 +1577,8 @@ function viewToggle(r) {
     h(
       'div',
       { class: 'vtoggle' },
-      h('button', { class: r.fileView === 'path' ? 'on' : '', onclick: set('path') }, icon('list', 13), 'Path'),
-      h('button', { class: r.fileView === 'tree' ? 'on' : '', onclick: set('tree') }, icon('tree', 13), 'Tree')
+      h('button', { class: S.settings.fileView === 'path' ? 'on' : '', onclick: set('path') }, icon('list', 13), 'Path'),
+      h('button', { class: S.settings.fileView === 'tree' ? 'on' : '', onclick: set('tree') }, icon('tree', 13), 'Tree')
     )
   );
 }
@@ -1617,7 +1616,7 @@ function renderRight() {
   const sel = r.selected;
   const range = r.multi.size > 1 ? multiRange(r) : null;
   const files = range ? r.files.get(range.key) : sel && sel !== 'WIP' ? r.files.get(sel) : null;
-  const sig = JSON.stringify([r.path, sel, [...r.multi], d.status.raw, r.fileView, d.op, d.head, r.view && r.view.mode + r.view.file.path, files ? files.length : -1, r.msg.amend]);
+  const sig = JSON.stringify([r.path, sel, [...r.multi], d.status.raw, S.settings.fileView, d.op, d.head, r.view && r.view.mode + r.view.file.path, files ? files.length : -1, r.msg.amend]);
   if (sig === r.rightSig && box.dataset.path === r.path) return;
   r.rightSig = sig;
   box.dataset.path = r.path;
