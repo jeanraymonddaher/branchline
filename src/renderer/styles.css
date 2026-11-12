@@ -667,3 +667,21 @@ html[data-theme=light] .commitbtn.ready { background: #2c8a2a; color: #fff; }
 /* clear-message button beside "Amend previous commit" */
 .amendrow { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .clearmsg { display: inline-flex; align-items: center; gap: 4px; }
+
+/* top bar finish: lighter icon strokes, clearer breadcrumb arrow, calmer inactive tabs */
+.tcenter .iconbtn > .ico svg, .tright .iconbtn > .ico svg { width: 21px; height: 21px; stroke-width: 1.25; }
+.tcenter .grp .dd .ico svg { width: 11px; height: 11px; stroke-width: 1.6; }
+.tcenter { gap: 20px; }
+.tcenter .iconbtn, .tright .iconbtn { border-radius: 5px; }
+.crumbsep { color: var(--text); display: inline-flex; margin: 0 4px; }
+.crumbsep svg { width: 15px; height: 15px; stroke-width: 1.5; }
+.crumb .ico svg { stroke-width: 1.8; }
+.tab { font-weight: 500; }
+.tab.active { font-weight: 700; }
+#tb-right .iconbtn > .ico svg { stroke-width: 1.25; }
+
+/* the // WIP row: one quiet field across the message column, counts at its right edge */
+.row.wip .mcell { display: flex; align-items: center; gap: 10px; padding-right: 10px; }
+.wipbox { flex: 1; min-width: 60px; height: 20px; line-height: 18px; box-sizing: border-box; padding: 0 9px; border-radius: 3px; border: 1px solid color-mix(in srgb, var(--line2) 80%, transparent); background: var(--wipbox); color: var(--dim); font: calc(13px + var(--fz))/18px 'Open Sans', -apple-system, sans-serif; letter-spacing: .2px; overflow: hidden; white-space: nowrap; }
+.row.wip.sel .wipbox { color: var(--text2); border-color: var(--line2); }
+.wipcount { gap: 4px; font-size: calc(12.5px + var(--fz)); flex: none; }

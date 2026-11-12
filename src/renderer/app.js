@@ -377,7 +377,7 @@ async function push(branch) {
   const res = await op('Push ' + b.name, args, { silentFail: true });
   if (res && res.failed) {
     if (/rejected|non-fast-forward|fetch first/i.test(res.stderr)) {
-      const ok = await confirmBox(
+      const ok = S.settings.forceNoAsk || await confirmBox(
         'Push rejected',
         `The remote branch has commits that ${b.name} does not. Pull first, or force push to overwrite the remote branch (uses --force-with-lease).`,
         'Force Push',
@@ -485,7 +485,7 @@ async function deleteBranch(b) {
   const res = await op('Delete ' + b.name, ['branch', '-d', b.name], { silentFail: true });
   if (res && res.failed) {
     if (/not fully merged/.test(res.stderr)) {
-      if (await confirmBox('Branch not merged', `${b.name} has commits that are not merged anywhere else. Delete it anyway?`, 'Force Delete', true)) {
+      if (S.settings.forceNoAsk || await confirmBox('Branch not merged', `${b.name} has commits that are not merged anywhere else. Delete it anyway?`, 'Force Delete', true)) {
         await op('Delete ' + b.name, ['branch', '-D', b.name]);
       }
     } else gitError('Delete failed', res);
@@ -914,6 +914,7 @@ async function settingsDialog() {
       { name: 'avatars', type: 'checkbox', label: 'Show author avatars (loads from Gravatar and GitHub)', value: s.avatars },
       { name: 'limit', type: 'number', label: 'Commits to load at a time', value: s.limit },
       { name: 'pullMode', type: 'select', label: 'Default pull action', value: s.pullMode, options: Object.entries(PULL).map(([value, p]) => ({ value, label: p.label })) },
+      { name: 'forceNoAsk', type: 'checkbox', label: 'Force push and force delete without asking (a rejected push overwrites the remote branch; unmerged branches are deleted)', value: !!s.forceNoAsk },
     ],
     ok: 'Save',
   });
@@ -921,6 +922,7 @@ async function settingsDialog() {
   s.avatars = v.avatars;
   s.limit = Math.max(200, Math.min(20000, +v.limit || 2000));
   s.pullMode = v.pullMode;
+  s.forceNoAsk = !!v.forceNoAsk;
   s.theme = v.theme;
   s.textSize = +v.textSize;
   applyAppearance();
@@ -1410,7 +1412,7 @@ async function bulkDelete(r, gs) {
     if (res && res.failed) {
       const left = [...res.stderr.matchAll(/branch '(.+?)' is not fully merged/g)].map((m) => m[1]);
       if (!left.length) gitError('Delete failed', res);
-      else if (await confirmBox('Branches not merged', `${left.length} of them ${left.length > 1 ? 'have' : 'has'} commits that are not merged anywhere else. Delete anyway?`, 'Force Delete', true, left.join('\n')))
+      else if (S.settings.forceNoAsk || await confirmBox('Branches not merged', `${left.length} of them ${left.length > 1 ? 'have' : 'has'} commits that are not merged anywhere else. Delete anyway?`, 'Force Delete', true, left.join('\n')))
         await op(`Delete ${left.length} branches`, ['branch', '-D', ...left]);
     }
   }
