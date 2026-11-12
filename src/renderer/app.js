@@ -2595,6 +2595,8 @@ async function init() {
   const stored = await api.storeLoad();
   if (stored) S = { ...S, ...stored, settings: { ...S.settings, ...(stored.settings || {}), cols: { ...S.settings.cols, ...((stored.settings || {}).cols || {}) } } };
   for (const [e, u] of Object.entries(S.avatarMap || {})) G.setAvatar(e, u);
+  // Commits made on github.com (merges, web edits) are committed by GitHub itself.
+  G.setAvatar('noreply@github.com', 'https://github.com/github.png?size=80');
   setCompact(S.settings.compact);
   wire();
   await initProfiles();
