@@ -481,3 +481,24 @@ html[data-theme=light] .band { opacity: .16; }
 .cdcard .cs { color: var(--bright); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cdcard .cm { color: var(--dim); font-size: calc(12px + var(--fz)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cdcard .ch { font: 600 calc(13px + var(--fz)) var(--mono); color: var(--bright); flex: none; align-self: flex-start; }
+
+/* ---- left panel, second pass: lighter and quieter, closer to GitKraken ---- */
+:root { --greenbg: #33553a; }
+.sec { font-weight: 600; color: var(--text2); border-top: none; padding: 7px 12px 6px 8px; margin-top: 3px; letter-spacing: .3px; }
+.sec .chev svg { stroke-width: 1.7; }
+.sec .ico { color: var(--dim); }
+.sec .chev { color: var(--text); }
+.sec .cnt { font-weight: 400; }
+.ritem .ico { color: var(--dim); }
+.ritem.cur > .ico { color: var(--text2); }
+.ritem .ab { font-weight: 400; color: var(--text2); word-spacing: 3px; }
+.ritem.cur .ab { color: var(--sidecur); }
+.ritem.cur .cb { background: #3fae49; width: 14px; height: 14px; }
+.ritem.cur .cb svg { stroke-width: 2.4; }
+#filterbox { padding: 2px 12px 9px; }
+#filter { height: 22px; background: var(--bg0); border-color: var(--line); }
+#filter-ico { top: 5px; color: var(--dim); }
+#viewing .railexp, #lrail .railexp { background: #d6d8dc; color: #1b1d23; }
+#viewing .railexp svg, #lrail .railexp svg { stroke-width: 2.4; }
+html[data-theme=light] { --greenbg: #cfe9c9; }
+html[data-theme=light] #viewing .railexp, html[data-theme=light] #lrail .railexp { background: #4a505a; color: #fff; }

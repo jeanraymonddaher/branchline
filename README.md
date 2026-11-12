@@ -1,6 +1,20 @@
 # Branchline
 
-A dark, graph-first Git client for macOS with profile switching. It drives the `git` CLI already on the machine.
+A graph-first Git client for macOS with profile switching, inspired by GitKraken. It drives the `git` CLI already on the machine.
+
+![Branchline showing a commit graph, branch sidebar and commit details](docs/screenshot.png)
+
+*The screenshot shows a made-up demo repository.*
+
+## Features
+
+- Commit graph with branches, tags and stashes; hide any branch from the graph
+- Stage files or single hunks, commit, amend, pull, push, fetch
+- Merge, rebase, squash, cherry-pick, reset; select several commits to see their combined changes
+- Profiles that switch your Git name and email, each with its own open repositories and avatar
+- Auto-pull chosen branches on a timer, per repository
+- Pull request chip for the current branch and clone from GitHub (both use the `gh` CLI)
+- Themes (Dark, Midnight, Ocean, Light), text size, collapsible side panel, self-updating
 
 ## Install on another Mac
 

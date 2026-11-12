@@ -20,7 +20,7 @@ let S = {
   avatarMap: {},
   autoPull: {},
   hidden: {},
-  settings: { avatars: true, limit: 2000, pullMode: 'ff', fileView: 'path', leftCollapsed: false, theme: 'dark', textSize: -1, refW: 150, graphW: null, compact: false, smart: false, cols: { ref: true, graph: true, msg: true, author: false, date: false, sha: false } },
+  settings: { avatars: true, limit: 2000, pullMode: 'ff', fileView: 'path', leftCollapsed: false, theme: 'dark', textSize: -1, refW: 184, graphW: null, compact: false, smart: false, cols: { ref: true, graph: true, msg: true, author: false, date: false, sha: false } },
 };
 const repos = new Map();
 const save = debounce(() => api.storeSave(S), 250);
