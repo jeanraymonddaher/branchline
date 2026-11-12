@@ -731,3 +731,6 @@ html[data-theme=light] .commitbtn.ready { background: #2c8a2a; color: #fff; }
 .tkt:hover { background: color-mix(in srgb, var(--accent) 26%, transparent); }
 .amendrow .amend { flex: 1; }
 .tktfill { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 55%, transparent); }
+
+/* tabs keep one weight; only the colour marks the selected one */
+.tab, .tab.active { font-weight: 600; }
