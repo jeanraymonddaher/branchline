@@ -28,6 +28,7 @@ const ICONS = {
   plus: P('M8 3v10M3 8h10'),
   minus: P('M3 8h10'),
   close: P('M4 4l8 8M12 4l-8 8'),
+  ext: P('M9.5 2.5h4v4M13.5 2.5L8 8M11.5 9.5v4h-9v-9h4'),
   history: P('M2.5 8a5.5 5.5 0 1 0 1.7-4M2.3 2.2v2.6h2.6M8 5v3.2l2 1.3'),
   chevDown: P('M4 6l4 4 4-4'),
   chevRight: P('M6 4l4 4-4 4'),

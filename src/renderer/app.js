@@ -146,7 +146,6 @@ async function rebuild(r) {
     if (f) r.view.file = f;
     else r.view = null;
   }
-  loadPr(r);
   loadPrList(r);
 }
 
@@ -213,56 +212,19 @@ function eyeBtn(r, g) {
   );
 }
 
-// ---- pull request for the current branch (GitHub, through the gh CLI)
-async function loadPr(r) {
-  const branch = (r.data && r.data.head.branch) || '';
-  if (r.prKey === branch && Date.now() - (r.prAt || 0) < 180000) return;
-  r.prKey = branch;
-  r.prAt = Date.now();
-  const fields = 'number,url,title,state,isDraft,headRefName';
-  const [cur, mine] = await Promise.all([
-    branch ? api.gh(['pr', 'list', '--head', branch, '--state', 'all', '--limit', '1', '--json', fields], r.path) : null,
-    api.gh(['pr', 'list', '--author', '@me', '--state', 'open', '--limit', '30', '--json', fields], r.path),
-  ]);
-  if (r.prKey !== branch) return;
-  const parse = (res) => {
-    try {
-      return res && res.code === 0 ? JSON.parse(res.stdout) : null;
-    } catch {
-      return null;
-    }
-  };
-  const m = parse(mine);
-  const c = parse(cur);
-  // Not a GitHub repository, or gh is missing or signed out: show nothing.
-  const pr = m || c ? { cur: (c && c[0]) || null, mine: m || [] } : null;
-  const was = JSON.stringify(r.pr);
-  r.pr = pr;
-  if (was !== JSON.stringify(pr) && R() === r) renderToolbar();
-}
-const prState = (pr) => (pr.isDraft && pr.state === 'OPEN' ? 'draft' : pr.state.toLowerCase());
-function prChip(r) {
-  const pr = r.pr;
-  if (!pr) return null;
+// ---- the checked-out branch on the remote's website
+async function openBranchOnRemote(r) {
   const b = r.data.refs.locals.find((x) => x.head);
-  const canCreate = !pr.cur && b && b.upstream && !b.gone && !['main', 'master', 'develop', 'trunk'].includes(b.name);
-  if (!pr.cur && !pr.mine.length && !canCreate) return null;
-  const others = pr.mine.filter((x) => !pr.cur || x.number !== pr.cur.number);
-  const items = [
-    ...(pr.cur ? [{ header: 'This branch' }, { label: `#${pr.cur.number}  ${pr.cur.title}`, hint: prState(pr.cur), icon: 'pr', action: () => api.openUrl(pr.cur.url) }, { label: 'Copy link', icon: 'copy', action: () => api.copy(pr.cur.url) }] : []),
-    ...(canCreate ? [{ label: `Create pull request for ${b.name}…`, icon: 'plus', action: () => api.gh(['pr', 'create', '--web', '--head', b.name], r.path) }] : []),
-    ...(others.length ? ['-', { header: 'My open pull requests' }, ...others.map((x) => ({ label: `#${x.number}  ${x.title}`, hint: x.headRefName, icon: 'pr', action: () => api.openUrl(x.url) }))] : []),
-  ];
-  return h(
-    'button',
-    {
-      class: 'prchip ' + (pr.cur ? prState(pr.cur) : 'none'),
-      title: pr.cur ? `#${pr.cur.number} ${pr.cur.title} (${prState(pr.cur)})` : pr.mine.length ? `You have ${pr.mine.length} open pull request${pr.mine.length === 1 ? '' : 's'} in this repository` : 'Create a pull request',
-      onclick: (e) => menuAt(e.currentTarget, items, { right: true, minWidth: 360 }),
-    },
-    icon('pr', 15),
-    pr.cur ? '#' + pr.cur.number : pr.mine.length ? String(pr.mine.length) : 'Create PR'
-  );
+  const remote = b && b.upstream ? b.upstream.split('/')[0] : r.data.remotes.includes('origin') ? 'origin' : r.data.remotes[0];
+  if (!remote) return toast('This repository has no remote.');
+  const url = (await G.gitOut(r.path, ['remote', 'get-url', remote])).trim();
+  const m = /^(?:https?:\/\/|ssh:\/\/git@|git@)(?:[^@/]+@)?([^/:]+)[/:](.+?)(?:\.git)?\/?$/.exec(url);
+  if (!m) return toast('Could not work out a web address for ' + remote + '.');
+  const web = `https://${m[1]}/${m[2]}`;
+  // A branch that was never pushed has no page; open the repository instead.
+  if (!b || !b.upstream || b.gone) return api.openUrl(web);
+  const name = b.upstream.slice(remote.length + 1).split('/').map(encodeURIComponent).join('/');
+  api.openUrl(web + (/gitlab/.test(m[1]) ? '/-/tree/' : /bitbucket/.test(m[1]) ? '/src/' : '/tree/') + name);
 }
 
 // ---- optional (Preferences): pull request list in the left panel, with checks and review state on branches
@@ -1210,7 +1172,7 @@ function renderToolbar() {
       tbtn('stash', dirtyCount(d) ? 'Stash — set your uncommitted changes aside so the working directory is clean' : 'Stash — nothing to stash, there are no uncommitted changes', stash, !dirtyCount(d)),
       tbtn('pop', d.stashes.length ? 'Pop — put the most recent stash back into your working directory and remove it from the stash list' : 'Pop — there are no stashes', pop, !d.stashes.length)
     ),
-    h('div', { class: 'tright' }, prChip(r), tbtn('search', 'Search commits by message, author or SHA (⌘F)', () => toggleSearch(true)))
+    h('div', { class: 'tright' }, d.remotes.length ? tbtn('ext', d.head.branch ? `Open ${d.head.branch} on the remote’s website` : 'Open the repository on the remote’s website', () => openBranchOnRemote(r)) : null, tbtn('search', 'Search commits by message, author or SHA (⌘F)', () => toggleSearch(true)))
   );
 }
 
@@ -2926,6 +2888,6 @@ async function init() {
     for (const p of INFO.devOpen.split(':')) await openRepo(p, { quiet: true });
   } else activate(S.active);
  wireDrops();
-  window.__app = { setUpdate: (v) => ((updateAvailable = v), renderTitleRight()), ticketKeys, loadPrList, prChecks, settingsDialog, renderLeft, renderRight, openHistory, histPick, setHidden, isHidden, loadPr, autoPullRun, autoPullDialog, autoState, applyAppearance, editProfile, moveTab, openMany, columnsMenu, applyGraphSettings, S: () => S, R, repos, openRepo, selectSha, openDiff, refresh, squash, squashable, headChain, cloneDialog, profileMenu, commitMenu, activate, checkout, cherryPick, resetTo, stash, pop, mergeInto, rebaseOnto, undo, redo, stage, unstage, stageAll, doCommit, switchProfile, applyHunk, push, pull, createBranch, G };
+  window.__app = { setUpdate: (v) => ((updateAvailable = v), renderTitleRight()), ticketKeys, loadPrList, prChecks, settingsDialog, renderLeft, renderRight, openHistory, histPick, setHidden, isHidden, openBranchOnRemote, autoPullRun, autoPullDialog, autoState, applyAppearance, editProfile, moveTab, openMany, columnsMenu, applyGraphSettings, S: () => S, R, repos, openRepo, selectSha, openDiff, refresh, squash, squashable, headChain, cloneDialog, profileMenu, commitMenu, activate, checkout, cherryPick, resetTo, stash, pop, mergeInto, rebaseOnto, undo, redo, stage, unstage, stageAll, doCommit, switchProfile, applyHunk, push, pull, createBranch, G };
 }
 init();

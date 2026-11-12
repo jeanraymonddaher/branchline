@@ -13,7 +13,7 @@ A graph-first Git client for macOS with profile switching, inspired by GitKraken
 - Merge, rebase, squash, cherry-pick, reset; select several commits to see their combined changes
 - Profiles that switch your Git name and email, each with its own open repositories and avatar
 - Auto-pull chosen branches on a timer, per repository
-- Pull request chip for the current branch and clone from GitHub (both use the `gh` CLI)
+- One-click link to the checked-out branch on the remote's website, and clone from GitHub (uses the `gh` CLI)
 - Themes (Dark, Midnight, Ocean, Light), text size, collapsible side panel, self-updating
 
 ## Optional features
