@@ -739,7 +739,6 @@ async function switchProfile(p) {
     cur.active = S.active;
   }
   S.profileId = p.id;
-  if (p.avatar) G.setAvatar(p.email, p.avatar);
   toast(`Profile: ${p.label} — commits are now authored as ${p.name} <${p.email}>`);
   if (changing && Array.isArray(p.tabs)) {
     for (const t of S.tabs) {
@@ -2416,7 +2415,6 @@ async function init() {
   setCompact(S.settings.compact);
   wire();
   await initProfiles();
-  for (const p of S.profiles) if (p.avatar) G.setAvatar(p.email, p.avatar);
   // Drop tabs whose folders no longer exist.
   const ok = await Promise.all(S.tabs.map((t) => G.git(t.path, ['rev-parse', '--git-dir']).then((x) => x.code === 0)));
   S.tabs = S.tabs.filter((t, i) => ok[i]);
