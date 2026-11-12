@@ -502,3 +502,12 @@ html[data-theme=light] .band { opacity: .16; }
 #viewing .railexp svg, #lrail .railexp svg { stroke-width: 2.4; }
 html[data-theme=light] { --greenbg: #cfe9c9; }
 html[data-theme=light] #viewing .railexp, html[data-theme=light] #lrail .railexp { background: #4a505a; color: #fff; }
+
+/* resizable left panel */
+#left { width: var(--leftw, 288px); position: relative; }
+#lgrip { position: absolute; top: 0; bottom: 0; right: -3px; width: 7px; cursor: col-resize; z-index: 5; }
+#lgrip:hover, body.resizing #lgrip { background: var(--accent); opacity: .5; }
+#left.collapsed #lgrip { display: none !important; }
+#left.collapsed > #lgrip { display: none; }
+body.resizing { cursor: col-resize; }
+body.resizing * { user-select: none !important; }

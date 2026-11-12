@@ -658,6 +658,40 @@ function moveTab(from, to, after) {
   save();
   renderTabs();
 }
+// The left panel's width: drag its right edge, double-click to reset.
+const LEFT_W = 288;
+function applyLeftWidth() {
+  $('left').style.setProperty('--leftw', Math.max(200, Math.min(640, S.settings.leftW || LEFT_W)) + 'px');
+}
+function wireLeftGrip() {
+  const grip = $('lgrip');
+  grip.addEventListener('mousedown', (e) => {
+    e.preventDefault();
+    const start = e.clientX;
+    const w0 = $('left').getBoundingClientRect().width;
+    document.body.classList.add('resizing');
+    const move = (ev) => {
+      S.settings.leftW = Math.round(w0 + ev.clientX - start);
+      applyLeftWidth();
+    };
+    const up = () => {
+      removeEventListener('mousemove', move);
+      removeEventListener('mouseup', up);
+      document.body.classList.remove('resizing');
+      S.settings.leftW = Math.max(200, Math.min(640, S.settings.leftW || LEFT_W));
+      save();
+      renderGraph();
+    };
+    addEventListener('mousemove', move);
+    addEventListener('mouseup', up);
+  });
+  grip.addEventListener('dblclick', () => {
+    S.settings.leftW = LEFT_W;
+    applyLeftWidth();
+    save();
+    renderGraph();
+  });
+}
 function wireDrops() {
   const zoneOf = (e) => {
     const z = e.target.closest && e.target.closest('#right .fsec[data-zone]');
@@ -2421,6 +2455,8 @@ async function init() {
   S.active = Math.max(0, Math.min(S.active, S.tabs.length - 1));
   dedupeTabs();
   applyAppearance();
+  applyLeftWidth();
+  wireLeftGrip();
   setInterval(autoPullTick, 20000);
   api.onUpdateAvailable((v) => {
     updateAvailable = v;
