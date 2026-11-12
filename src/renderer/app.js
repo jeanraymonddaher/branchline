@@ -987,7 +987,7 @@ function renderTree(r, node, depth, key, mkLeaf, out) {
               renderLeft();
             },
           },
-          icon('folder', 13),
+          icon('folder', 15),
           h('span', { class: 'nm' }, e.name)
         )
       );
@@ -1007,8 +1007,8 @@ function section(r, key, title, ico, count, body) {
           renderLeft();
         },
       },
-      icon(open ? 'chevDown' : 'chevRight', 12),
-      icon(ico, 14),
+      icon(open ? 'chevDown' : 'chevRight', 13, 'chev'),
+      icon(ico, 17),
       h('span', {}, title),
       h('span', { class: 'cnt' }, String(count))
     ),
@@ -1052,8 +1052,8 @@ function renderLeft() {
         ondblclick: () => checkout(b),
         oncontextmenu: (e) => refMenu(e, { local: b, name: b.name }),
       },
-      b.head ? h('span', { class: 'cb' }, icon('check', 11)) : null,
-      icon('branch', 12),
+      b.head ? h('span', { class: 'cb' }, icon('check', 12)) : null,
+      icon('branch', 14),
       h('span', { class: 'nm' }, name),
       b.ahead || b.behind ? h('span', { class: 'ab' }, [b.ahead ? cap(b.ahead) + '↑' : '', b.behind ? cap(b.behind) + '↓' : ''].filter(Boolean).join(' ')) : null
     );
@@ -1068,7 +1068,7 @@ function renderLeft() {
         ondblclick: () => checkout(b),
         oncontextmenu: (e) => refMenu(e, { remote: b, name: b.short }),
       },
-      icon('branch', 12),
+      icon('branch', 14),
       h('span', { class: 'nm' }, name)
     );
 
@@ -1103,7 +1103,7 @@ function renderLeft() {
                 renderLeft();
               },
             },
-            icon('globe', 13),
+            icon('globe', 15),
             h('span', { class: 'nm' }, rem)
           )
         );
@@ -1128,7 +1128,7 @@ function renderLeft() {
             h(
               'div',
               { class: 'ritem', style: { paddingLeft: '30px' }, title: t.name, onclick: () => jump(t.sha), oncontextmenu: (e) => refMenu(e, { tag: t, name: t.name }) },
-              icon('tag', 12),
+              icon('tag', 14),
               h('span', { class: 'nm' }, t.name)
             )
           )
@@ -1140,7 +1140,7 @@ function renderLeft() {
             h(
               'div',
               { class: 'ritem', style: { paddingLeft: '30px' }, title: s.msg, ondblclick: () => op('Apply stash', ['stash', 'apply', s.ref]), oncontextmenu: (e) => stashMenu(e, s) },
-              icon('box', 12),
+              icon('box', 14),
               h('span', { class: 'nm' }, s.msg)
             )
           )
@@ -1307,11 +1307,11 @@ function refLabel(g) {
       },
       oncontextmenu: (e) => refMenu(e, g),
     },
-    g.head ? icon('check', 11) : null,
+    g.head ? icon('check', 12) : null,
     h('span', { class: 'nm' }, g.name),
-    g.local ? icon('laptop', 12) : null,
-    g.remote ? icon('globe', 11, 'rico') : null,
-    g.tag ? icon('tag', 12) : null
+    g.local ? icon('laptop', 13) : null,
+    g.remote ? icon('globe', 12, 'rico') : null,
+    g.tag ? icon('tag', 13) : null
   );
 }
 

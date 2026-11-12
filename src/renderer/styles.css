@@ -421,3 +421,26 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent); }
 #viewing { padding-right: 8px; }
 /* keep the repo and branch names clear of the centred toolbar buttons in narrow windows */
 .crumb { max-width: min(300px, calc((50vw - 200px) / 2)); min-width: 0; }
+
+/* ---- finish: heavier icons, clearer sidebar and labels ---- */
+.ico svg { stroke-width: 1.55; }
+.sec { font-size: calc(13px + var(--fz)); font-weight: 700; color: var(--bright); padding: 8px 12px 8px 8px; }
+.sec .chev svg, .ritem .cb svg, .lbl .ico svg { stroke-width: 2.2; }
+.sec .ico { color: var(--text); }
+.sec .cnt { font-weight: 700; }
+.ritem { font-size: calc(14px + var(--fz)); gap: 7px; }
+.ritem .nm { color: var(--side); }
+.ritem .ico { color: var(--text); }
+.ritem.cur, .ritem.cur .nm { color: var(--sidecur); }
+.ritem.cur .cb { width: 15px; height: 15px; left: 9px; border-radius: 3px; }
+.ritem .ab { font: 600 calc(12.5px + var(--fz)) 'Open Sans', -apple-system, sans-serif; color: var(--sidecur); letter-spacing: .2px; }
+#filter { height: 26px; font-size: calc(13px + var(--fz)); border-color: var(--line2); }
+#filter-ico { top: 7px; color: var(--text); }
+.lbl { height: 22px; font-size: calc(13.5px + var(--fz)); padding: 0 5px; gap: 5px; max-width: calc(var(--refw) - 38px); }
+.lbl .rico { padding: 1px; }
+.band { opacity: .2; }
+.row.sel .band, .row.wip .band { opacity: .38; }
+:root { --side: #d3d6db; --sidecur: #ffffff; --lbltext: #e3e5e9; --lblhead: #ffffff; }
+html[data-theme=ocean] { --side: #cfd9e3; }
+html[data-theme=light] { --side: #2a2e36; --sidecur: #0c0e12; --lbltext: #1d2026; --lblhead: #0c0e12; }
+html[data-theme=light] .band { opacity: .16; }
