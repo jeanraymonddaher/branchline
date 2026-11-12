@@ -1937,6 +1937,7 @@ function fileMenu(e, r, f, mode) {
       ? { label: 'Add to .gitignore', action: async () => (await G.git(r.path, ['rev-parse']), await appendIgnore(r, f.path)) }
       : null,
     '-',
+    f.status !== '?' ? { label: 'File history', icon: 'history', action: () => openHistory(f, mode) } : null,
     { label: 'Reveal in Finder', icon: 'folder', action: () => api.reveal(abs) },
     { label: 'Copy file path', icon: 'copy', action: () => api.copy(f.path) },
   ]);
@@ -2286,6 +2287,39 @@ function openDiff(f, mode) {
   r.rightSig = null;
   renderRight();
 }
+// File history: every commit that touched a file (following renames), newest first, with the diff beside it.
+async function openHistory(f, mode) {
+  const r = R();
+  if (!r) return;
+  const sel = mode === 'commit' && r.selected && r.selected !== 'WIP' ? (r.multi.size > 1 && multiRange(r) ? multiRange(r).newest.sha : r.selected) : 'HEAD';
+  const out = await G.gitOut(r.path, ['log', '--follow', '-M', '-n', '1000', '--name-status', '--format=%x1e%H%x1f%P%x1f%an%x1f%ae%x1f%at%x1f%s', sel, '--', f.path]);
+  const hist = out
+    .split('\x1e')
+    .slice(1)
+    .map((rec) => {
+      const lines = rec.split('\n');
+      const p = lines[0].split('\x1f');
+      const t = (lines.slice(1).find((l) => l.trim()) || '').split('\t');
+      const st = (t[0] || 'M')[0];
+      const file = st === 'R' || st === 'C' ? { status: st, orig: t[1], path: t[2] } : { status: st, path: t[1] || f.path };
+      return { sha: p[0], parents: p[1] ? p[1].split(' ') : [], author: p[2], email: p[3], at: +p[4], subject: p[5], file };
+    });
+  if (!hist.length) return toast('This file has no committed history yet.');
+  G.resolveAvatars([...new Set(hist.map((x) => x.email))]);
+  r.view = { file: hist[0].file, mode: 'commit', sha: hist[0].sha, hist, histPath: f.path };
+  r.diffSig = null;
+  renderCenter();
+  r.rightSig = null;
+  renderRight();
+}
+function histPick(i) {
+  const r = R();
+  const v = r && r.view;
+  if (!v || !v.hist || !v.hist[i]) return;
+  v.sha = v.hist[i].sha;
+  v.file = v.hist[i].file;
+  renderDiff();
+}
 function closeDiff() {
   const r = R();
   if (!r || !r.view) return;
@@ -2326,7 +2360,7 @@ async function renderDiff() {
   if (sig === r.diffSig && box.dataset.sig === sig) return;
   r.diffSig = sig;
   const full = o.view === 'full';
-  const text = await G.fileDiff(r.path, v.file, v.mode, v.mode === 'commit' ? v.range || r.bySha.get(v.sha) : null, { full, ws: o.ws });
+  const text = await G.fileDiff(r.path, v.file, v.mode, v.mode === 'commit' ? v.range || (v.hist && v.hist.find((x) => x.sha === v.sha)) || r.bySha.get(v.sha) : null, { full, ws: o.ws });
   if (R() !== r || r.view !== v) return;
   const sameFile = box.dataset.file === v.mode + v.sha + v.file.path;
   const keepScroll = sameFile && box.dataset.view === o.view ? box.querySelector('.dbody')?.scrollTop : null;
@@ -2419,6 +2453,7 @@ async function renderDiff() {
     if (count > MAX) frag.append(h('div', { class: 'dnote' }, 'Diff truncated — this file is very large.'));
     inner.append(frag);
   }
+  const histScroll = box.querySelector('.hlist')?.scrollTop;
   const body = h('div', { class: 'dbody' + (split ? ' split' : '') + (o.wrap ? ' wrap' : '') }, inner);
   const seg = (key, opts) => h('div', { class: 'vtoggle dseg' }, opts.map(([val, label, tip]) => h('button', { class: o[key] === val ? 'on' : '', title: tip, onclick: () => setDiffOpt(key, val) }, label)));
   const tog = (key, label, tip) => h('button', { class: 'dtog' + (o[key] ? ' on' : ''), title: tip, onclick: () => setDiffOpt(key, !o[key]) }, label);
@@ -2428,9 +2463,10 @@ async function renderDiff() {
       { class: 'dhead' },
       statusIcon(f.status),
       h('span', { class: 'dpath' }, f.orig ? `${f.orig} → ${f.path}` : f.path),
-      h('span', { class: 'dmode' }, v.range ? `${short(v.range.oldest.sha)} → ${short(v.range.newest.sha)}` : v.mode === 'commit' ? 'commit ' + short(v.sha) : v.mode === 'staged' ? 'Staged' : 'Unstaged'),
+      h('span', { class: 'dmode' }, v.hist ? `File history · ${plural(v.hist.length, 'commit')}` : v.range ? `${short(v.range.oldest.sha)} → ${short(v.range.newest.sha)}` : v.mode === 'commit' ? 'commit ' + short(v.sha) : v.mode === 'staged' ? 'Staged' : 'Unstaged'),
       v.mode === 'unstaged' && f.status !== 'U' ? h('button', { class: 'mini green', title: 'Add this file to the next commit', onclick: () => stage([f]) }, 'Stage File') : null,
       v.mode === 'staged' ? h('button', { class: 'mini red', title: 'Take this file out of the next commit. Your changes are kept.', onclick: () => unstage([f]) }, 'Unstage File') : null,
+      !v.hist && !v.range && f.status !== '?' ? h('button', { class: 'mini', title: 'Show every commit that changed this file', onclick: () => openHistory(f, v.mode) }, icon('history', 12), 'File History') : null,
       h('button', { class: 'iconbtn', title: 'Close (Esc)', onclick: closeDiff }, icon('close', 16))
     ),
     h(
@@ -2451,8 +2487,31 @@ async function renderDiff() {
       h('button', { class: 'iconbtn', title: 'Previous change', disabled: !changes, onclick: () => jumpChange(-1) }, icon('chevUp', 14)),
       h('button', { class: 'iconbtn', title: 'Next change', disabled: !changes, onclick: () => jumpChange(1) }, icon('chevDown', 14))
     ),
-    body
+    v.hist
+      ? h(
+          'div',
+          { class: 'hrow' },
+          h(
+            'div',
+            { class: 'hlist' },
+            v.hist.map((c, i) =>
+              h(
+                'div',
+                { class: 'hitem' + (c.sha === v.sha ? ' on' : ''), title: 'Click to see what this commit changed in the file. Double-click to find the commit in the graph.', onclick: () => histPick(i), ondblclick: () => selectSha(c.sha, true) },
+                avatarNode(c, 'hav'),
+                h('div', { class: 'hinfo' }, h('div', { class: 'hsub' }, c.subject), h('div', { class: 'hmeta' }, h('span', {}, c.author), h('span', {}, fmtDate(c.at)), h('span', { class: 'hsha' }, short(c.sha))))
+              )
+            )
+          ),
+          body
+        )
+      : body
   );
+  const hl = box.querySelector('.hlist');
+  if (hl) {
+    hl.scrollTop = histScroll || 0;
+    hl.querySelector('.hitem.on')?.scrollIntoView({ block: 'nearest' });
+  }
   if (keepScroll != null) body.scrollTop = keepScroll;
   else if (full) {
     // Open the whole-file view at the first change rather than at line 1.
@@ -2668,6 +2727,10 @@ function wire() {
     // With a file diff open, up/down step through the files in the right panel.
     const r = R();
     if (r && r.view && (e.key === 'ArrowDown' || e.key === 'ArrowUp') && !e.metaKey && !e.altKey && !/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName) && !document.querySelector('.modal-back, .menu')) {
+      if (r.view.hist) {
+        e.preventDefault();
+        return histPick(r.view.hist.findIndex((x) => x.sha === r.view.sha) + (e.key === 'ArrowDown' ? 1 : -1));
+      }
       const rows = [...document.querySelectorAll('#right .file')];
       const at = rows.findIndex((el) => el.classList.contains('open'));
       const next = rows[at + (e.key === 'ArrowDown' ? 1 : -1)];
@@ -2726,6 +2789,6 @@ async function init() {
     for (const p of INFO.devOpen.split(':')) await openRepo(p, { quiet: true });
   } else activate(S.active);
  wireDrops();
-  window.__app = { setHidden, isHidden, loadPr, autoPullRun, autoPullDialog, autoState, applyAppearance, editProfile, moveTab, openMany, columnsMenu, applyGraphSettings, S: () => S, R, repos, openRepo, selectSha, openDiff, refresh, squash, squashable, headChain, cloneDialog, profileMenu, commitMenu, activate, checkout, cherryPick, resetTo, stash, pop, mergeInto, rebaseOnto, undo, redo, stage, unstage, stageAll, doCommit, switchProfile, applyHunk, push, pull, createBranch, G };
+  window.__app = { openHistory, histPick, setHidden, isHidden, loadPr, autoPullRun, autoPullDialog, autoState, applyAppearance, editProfile, moveTab, openMany, columnsMenu, applyGraphSettings, S: () => S, R, repos, openRepo, selectSha, openDiff, refresh, squash, squashable, headChain, cloneDialog, profileMenu, commitMenu, activate, checkout, cherryPick, resetTo, stash, pop, mergeInto, rebaseOnto, undo, redo, stage, unstage, stageAll, doCommit, switchProfile, applyHunk, push, pull, createBranch, G };
 }
 init();

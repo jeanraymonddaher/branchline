@@ -690,3 +690,19 @@ html[data-theme=light] .commitbtn.ready { background: #2c8a2a; color: #fff; }
 .secbody, .secbody[data-key=local], .secbody[data-key=stashes] { flex: 3 1 0; }
 .secbody[data-key=tags] { flex-grow: 2; }
 .secbody[data-key=stashes] { flex-grow: 1; }
+
+/* file history: commit list beside the diff */
+.hrow { flex: 1; min-height: 0; display: flex; }
+.hrow .dbody { flex: 1; min-width: 0; }
+.hlist { flex: none; width: 300px; overflow-y: auto; border-right: 1px solid var(--line); background: var(--bg1); }
+.hitem { display: flex; gap: 9px; align-items: center; padding: 7px 10px; border-bottom: 1px solid color-mix(in srgb, var(--line) 60%, transparent); cursor: default; }
+.hitem:hover { background: var(--hover); }
+.hitem.on { background: color-mix(in srgb, var(--accent) 26%, transparent); box-shadow: inset 2px 0 0 var(--accent); }
+.hav { flex: none; width: 24px; height: 24px; border-radius: 50%; overflow: hidden; position: relative; display: flex; align-items: center; justify-content: center; font-size: calc(10px + var(--fz)); font-weight: 700; color: #fff; }
+.hav img { position: absolute; inset: 0; width: 100%; height: 100%; }
+.hinfo { min-width: 0; flex: 1; }
+.hsub { color: var(--bright); font-size: calc(13.5px + var(--fz)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hmeta { display: flex; gap: 8px; color: var(--dim); font-size: calc(11.5px + var(--fz)); white-space: nowrap; overflow: hidden; margin-top: 1px; }
+.hmeta span:first-child { overflow: hidden; text-overflow: ellipsis; }
+.hmeta .hsha { font-family: var(--mono); margin-left: auto; }
+.dhead .mini { display: inline-flex; align-items: center; gap: 5px; }
