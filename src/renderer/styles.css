@@ -685,3 +685,8 @@ html[data-theme=light] .commitbtn.ready { background: #2c8a2a; color: #fff; }
 .wipbox { flex: 1; min-width: 60px; height: 20px; line-height: 18px; box-sizing: border-box; padding: 0 9px; border-radius: 3px; border: 1px solid color-mix(in srgb, var(--line2) 80%, transparent); background: var(--wipbox); color: var(--dim); font: calc(13px + var(--fz))/18px 'Open Sans', -apple-system, sans-serif; letter-spacing: .2px; overflow: hidden; white-space: nowrap; }
 .row.wip.sel .wipbox { color: var(--text2); border-color: var(--line2); }
 .wipcount { gap: 4px; font-size: calc(12.5px + var(--fz)); flex: none; }
+
+/* left panel sections share the height by weight; short ones give their space to the others */
+.secbody, .secbody[data-key=local], .secbody[data-key=stashes] { flex: 3 1 0; }
+.secbody[data-key=tags] { flex-grow: 2; }
+.secbody[data-key=stashes] { flex-grow: 1; }

@@ -1327,7 +1327,8 @@ function renderLeft() {
     ))
   );
   // An open section never collapses below a few rows, however long its neighbours are.
-  for (const el of box.querySelectorAll('.secbody')) el.style.minHeight = Math.min(el.scrollHeight, 124) + 'px';
+  // Sections share the panel by weight (see styles), but none is taller than its own content.
+  for (const el of [...box.querySelectorAll('.secbody')].map((el) => [el, el.scrollHeight])) (el[0].style.minHeight = Math.min(el[1], 124) + 'px'), (el[0].style.maxHeight = el[1] + 'px');
   if (forceOpen) r.open = saved;
   if (box.dataset.path === r.path) for (const el of box.querySelectorAll('.secbody')) el.scrollTop = scrolls[el.dataset.key] || 0;
   box.dataset.path = r.path;
