@@ -8,6 +8,8 @@ contextBridge.exposeInMainWorld('api', {
   storeLoad: call('store:load'),
   storeSave: call('store:save'),
   pickDir: call('pickDir'),
+  pickDirs: call('pickDirs'),
+  childRepos: call('childRepos'),
   repoOp: call('repoOp'),
   watch: call('watch'),
   unwatch: call('unwatch'),

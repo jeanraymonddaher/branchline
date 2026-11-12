@@ -81,6 +81,22 @@ ipcMain.handle('pickDir', async (e, title) => {
   const r = await dialog.showOpenDialog(win, { title, properties: ['openDirectory', 'createDirectory'] });
   return r.canceled ? null : r.filePaths[0];
 });
+ipcMain.handle('pickDirs', async (e, title) => {
+  const r = await dialog.showOpenDialog(win, { title, message: 'Select one or more repositories, or a folder that contains them', buttonLabel: 'Open', properties: ['openDirectory', 'multiSelections'] });
+  return r.canceled ? [] : r.filePaths;
+});
+// Git repositories directly inside a folder (for opening a whole projects folder at once).
+ipcMain.handle('childRepos', (e, dir) => {
+  try {
+    return fs
+      .readdirSync(dir, { withFileTypes: true })
+      .filter((d) => d.isDirectory() && !d.name.startsWith('.') && fs.existsSync(path.join(dir, d.name, '.git')))
+      .map((d) => path.join(dir, d.name))
+      .sort((a, b) => a.localeCompare(b));
+  } catch {
+    return [];
+  }
+});
 ipcMain.handle('repoOp', (e, gitDir) => {
   const has = (f) => fs.existsSync(path.join(gitDir, f));
   if (has('rebase-merge') || has('rebase-apply')) return 'rebase';
@@ -219,7 +235,7 @@ function buildMenu() {
     {
       label: 'File',
       submenu: [
-        { label: 'Open Repository…', accelerator: 'Cmd+O', click: () => send('open') },
+        { label: 'Open Repositories…', accelerator: 'Cmd+O', click: () => send('open') },
         { label: 'Clone Repository…', accelerator: 'Cmd+Shift+O', click: () => send('clone') },
         { type: 'separator' },
         { label: 'Close Tab', accelerator: 'Cmd+W', click: () => send('close-tab') },

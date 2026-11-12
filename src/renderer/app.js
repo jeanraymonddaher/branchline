@@ -460,8 +460,38 @@ function closeTab(i) {
   activate(Math.max(0, Math.min(S.active > i ? S.active - 1 : S.active, S.tabs.length - 1)));
 }
 async function pickRepo() {
-  const dir = await api.pickDir('Open a repository');
-  if (dir) openRepo(dir);
+  openMany(await api.pickDirs('Open repositories'));
+}
+// Opens every path given. A folder that is not a repository opens the repositories directly inside it.
+async function openMany(paths) {
+  if (!paths || !paths.length) return;
+  const repoPaths = [];
+  const bad = [];
+  for (const p of paths) {
+    const res = await G.git(p, ['rev-parse', '--show-toplevel']);
+    if (res.code === 0) {
+      repoPaths.push(p);
+      continue;
+    }
+    const kids = await api.childRepos(p);
+    if (!kids.length) bad.push(p);
+    else if (kids.length === 1 || (await confirmBox(`Open ${kids.length} repositories?`, `${base(p)} is not a repository, but it contains ${kids.length}.`, `Open ${kids.length} tabs`, false, kids.map(base).join('\n')))) repoPaths.push(...kids);
+  }
+  let first = -1;
+  for (const p of repoPaths) {
+    const res = await G.git(p, ['rev-parse', '--show-toplevel']);
+    if (res.code !== 0) continue;
+    const top = res.stdout.trim();
+    let i = S.tabs.findIndex((t) => t.path === top);
+    if (i < 0) {
+      S.tabs.push({ path: top, name: base(top) });
+      i = S.tabs.length - 1;
+    }
+    S.recent = [top, ...S.recent.filter((x) => x !== top)].slice(0, 12);
+    if (first < 0) first = i;
+  }
+  if (first >= 0) activate(first);
+  if (bad.length) toast('').error(bad.length === 1 ? 'Not a Git repository' : `${bad.length} folders are not Git repositories`, bad.join('\n'));
 }
 function renderTabs() {
   put($('tabs'), 
@@ -559,16 +589,13 @@ function wireDrops() {
     }
     if (fromFinder(e)) {
       e.preventDefault();
-      for (const f of e.dataTransfer.files) {
-        const p = api.pathFor(f);
-        if (p) await openRepo(p);
-      }
+      openMany([...e.dataTransfer.files].map((f) => api.pathFor(f)).filter(Boolean));
     }
   });
 }
 
 const addMenu = () => [
-  { label: 'Open a repository…', icon: 'folder', hint: '⌘O', action: pickRepo },
+  { label: 'Open repositories…', icon: 'folder', hint: '⌘O', action: pickRepo },
   { label: 'Clone from GitHub…', icon: 'cloud', hint: '⇧⌘O', action: cloneDialog },
   ...(S.recent.filter((p) => !S.tabs.some((t) => t.path === p)).length ? ['-', { header: 'Recent' }] : []),
   ...S.recent
@@ -1961,7 +1988,7 @@ function renderWelcome() {
     h(
       'div',
       { class: 'wbtns' },
-      h('button', { class: 'btn primary', onclick: pickRepo }, 'Open a repository'),
+      h('button', { class: 'btn primary', onclick: pickRepo }, 'Open repositories'),
       h('button', { class: 'btn', onclick: cloneDialog }, 'Clone from GitHub')
     ),
     S.recent.length
@@ -2100,6 +2127,6 @@ async function init() {
     for (const p of INFO.devOpen.split(':')) await openRepo(p, { quiet: true });
   } else activate(S.active);
  wireDrops();
-  window.__app = { moveTab, columnsMenu, applyGraphSettings, S: () => S, R, repos, openRepo, selectSha, openDiff, refresh, squash, squashable, headChain, cloneDialog, profileMenu, commitMenu, activate, checkout, cherryPick, resetTo, stash, pop, mergeInto, rebaseOnto, undo, redo, stage, unstage, stageAll, doCommit, switchProfile, applyHunk, push, pull, createBranch, G };
+  window.__app = { moveTab, openMany, columnsMenu, applyGraphSettings, S: () => S, R, repos, openRepo, selectSha, openDiff, refresh, squash, squashable, headChain, cloneDialog, profileMenu, commitMenu, activate, checkout, cherryPick, resetTo, stash, pop, mergeInto, rebaseOnto, undo, redo, stage, unstage, stageAll, doCommit, switchProfile, applyHunk, push, pull, createBranch, G };
 }
 init();
