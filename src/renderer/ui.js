@@ -195,7 +195,30 @@ export function form({ title, message, detail, fields = [], ok = 'OK', danger = 
         });
         draw();
         inputs[f.name] = { get value() { return val; }, focus() {} };
-        return h('div', { class: 'frow' }, h('span', { class: 'flabel' }, f.label), h('div', { class: 'imgrow' }, prev, h('button', { class: 'btn', type: 'button', onclick: (e) => (e.preventDefault(), file.click()) }, 'Choose image…'), clear, file));
+        // Ready-made icons: an emoji on a coloured disc, drawn to the same 96px picture.
+        const preset = (emoji, color) => {
+          const c = document.createElement('canvas');
+          c.width = c.height = 96;
+          const x = c.getContext('2d');
+          x.fillStyle = color;
+          x.fillRect(0, 0, 96, 96);
+          x.font = '56px "Apple Color Emoji", sans-serif';
+          x.textAlign = 'center';
+          x.textBaseline = 'middle';
+          x.fillText(emoji, 48, 52);
+          return c.toDataURL('image/png');
+        };
+        const grid = f.presets
+          ? h(
+              'div',
+              { class: 'imggrid' },
+              f.presets.map(([emoji, color]) => {
+                const url = preset(emoji, color);
+                return h('button', { class: 'imgpick', type: 'button', title: 'Use this icon', onclick: (e) => (e.preventDefault(), (val = url), draw()) }, h('img', { src: url }));
+              })
+            )
+          : null;
+        return h('div', { class: 'frow' }, h('span', { class: 'flabel' }, f.label), h('div', { class: 'imgrow' }, prev, h('button', { class: 'btn', type: 'button', onclick: (e) => (e.preventDefault(), file.click()) }, 'Choose image…'), clear, file), grid);
       }
       if (f.type === 'select') {
         input = h(

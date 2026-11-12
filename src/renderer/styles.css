@@ -459,3 +459,8 @@ html[data-theme=light] .band { opacity: .16; }
 /* current-branch tick */
 .ritem.cur .cb { background: #43b649; }
 .ritem.cur .cb svg { stroke-width: 2.8; stroke: #fff; }
+
+.imggrid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 5px; margin-top: 6px; }
+.imgpick { padding: 0; border: 2px solid transparent; border-radius: 50%; background: none; overflow: hidden; aspect-ratio: 1; }
+.imgpick img { width: 100%; height: 100%; display: block; border-radius: 50%; }
+.imgpick:hover { border-color: var(--accent); }

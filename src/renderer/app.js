@@ -761,6 +761,11 @@ function profileAvatar(p, size) {
   if (p.avatar) el.append(h('img', { src: p.avatar, draggable: 'false' }));
   return el;
 }
+const AVATAR_ICONS = [
+  ['🚀', '#1f3a5f'], ['💼', '#3d4a5c'], ['🏠', '#2f5d50'], ['🦊', '#5a3320'], ['🐙', '#5b2a4e'], ['🐼', '#2f3640'], ['🦉', '#4a3b2a'], ['🐸', '#234d2c'],
+  ['🦄', '#4b2f6b'], ['🐱', '#5c4a1e'], ['👾', '#3a2d6b'], ['🤖', '#2b4a5e'], ['🔥', '#5e2a1c'], ['⚡', '#5a4a10'], ['🌙', '#1d2b53'], ['🌊', '#12455e'],
+  ['🌵', '#2d5230'], ['🍀', '#1f5a3a'], ['🎧', '#3b3b4f'], ['🧪', '#27504f'], ['🛠️', '#4a4038'], ['🎯', '#5a2230'], ['☕', '#4b3527'], ['⭐', '#57470f'],
+];
 async function editProfile(p) {
   const v = await form({
     title: p ? 'Edit profile' : 'New profile',
@@ -769,7 +774,7 @@ async function editProfile(p) {
       { name: 'label', label: 'Profile name', value: p?.label, required: true, placeholder: 'Work' },
       { name: 'name', label: 'Git author name', value: p?.name, required: true, placeholder: 'Jane Doe' },
       { name: 'email', label: 'Git author email', value: p?.email, required: true, placeholder: 'jane@example.com' },
-      { name: 'avatar', type: 'image', label: 'Avatar', value: p?.avatar || '' },
+      { name: 'avatar', type: 'image', label: 'Avatar — pick an icon or choose your own image', value: p?.avatar || '', presets: AVATAR_ICONS },
     ],
     ok: p ? 'Save' : 'Create Profile',
   });
