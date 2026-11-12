@@ -155,8 +155,10 @@ function isNewer(a, b) {
   return false;
 }
 let updating = false;
-async function checkForUpdates(manual) {
-  if (updating) return;
+let promptOpen = false;
+// quiet: only light up the update button, without the dialog (used by the hourly check).
+async function checkForUpdates(manual, quiet) {
+  if (updating || promptOpen) return;
   let rel;
   try {
     rel = await latestRelease();
@@ -170,6 +172,8 @@ async function checkForUpdates(manual) {
     return;
   }
   if (win && !win.isDestroyed()) win.webContents.send('update-available', latest);
+  if (quiet) return;
+  promptOpen = true;
   const { response } = await dialog.showMessageBox(win, {
     message: `Branchline ${latest} is available`,
     detail: `You have ${app.getVersion()}. Updating downloads the new version and restarts the app.`,
@@ -177,6 +181,7 @@ async function checkForUpdates(manual) {
     defaultId: 0,
     cancelId: 1,
   });
+  promptOpen = false;
   if (response === 0) installUpdate(rel);
 }
 async function installUpdate(rel) {
@@ -320,6 +325,7 @@ app.whenReady().then(() => {
   buildMenu();
   createWindow();
   if (!DEV) setTimeout(() => checkForUpdates(false), 8000);
+  if (!DEV) setInterval(() => checkForUpdates(false, true), 60 * 60 * 1000);
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });

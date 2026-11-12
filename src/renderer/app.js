@@ -980,8 +980,9 @@ function renderTitleRight() {
   put($('tb-right'), 
     h(
       'button',
-      { class: 'iconbtn' + (updateAvailable ? ' has-update' : ''), title: updateAvailable ? `Update to Branchline ${updateAvailable}` : 'Check for updates', onclick: () => api.checkUpdates() },
+      { class: 'iconbtn' + (updateAvailable ? ' has-update' : ''), title: updateAvailable ? `Branchline ${updateAvailable} is available. Click to update and restart.` : 'Check for updates', onclick: () => api.checkUpdates() },
       icon('update', 17),
+      updateAvailable ? h('span', { class: 'uplabel' }, 'Update') : null,
       updateAvailable ? h('span', { class: 'updot' }) : null
     ),
     h('button', { class: 'iconbtn', title: 'Preferences', onclick: settingsDialog }, icon('gear', 17)),
@@ -2925,6 +2926,6 @@ async function init() {
     for (const p of INFO.devOpen.split(':')) await openRepo(p, { quiet: true });
   } else activate(S.active);
  wireDrops();
-  window.__app = { ticketKeys, loadPrList, prChecks, settingsDialog, renderLeft, renderRight, openHistory, histPick, setHidden, isHidden, loadPr, autoPullRun, autoPullDialog, autoState, applyAppearance, editProfile, moveTab, openMany, columnsMenu, applyGraphSettings, S: () => S, R, repos, openRepo, selectSha, openDiff, refresh, squash, squashable, headChain, cloneDialog, profileMenu, commitMenu, activate, checkout, cherryPick, resetTo, stash, pop, mergeInto, rebaseOnto, undo, redo, stage, unstage, stageAll, doCommit, switchProfile, applyHunk, push, pull, createBranch, G };
+  window.__app = { setUpdate: (v) => ((updateAvailable = v), renderTitleRight()), ticketKeys, loadPrList, prChecks, settingsDialog, renderLeft, renderRight, openHistory, histPick, setHidden, isHidden, loadPr, autoPullRun, autoPullDialog, autoState, applyAppearance, editProfile, moveTab, openMany, columnsMenu, applyGraphSettings, S: () => S, R, repos, openRepo, selectSha, openDiff, refresh, squash, squashable, headChain, cloneDialog, profileMenu, commitMenu, activate, checkout, cherryPick, resetTo, stash, pop, mergeInto, rebaseOnto, undo, redo, stage, unstage, stageAll, doCommit, switchProfile, applyHunk, push, pull, createBranch, G };
 }
 init();

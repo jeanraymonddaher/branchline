@@ -734,3 +734,14 @@ html[data-theme=light] .commitbtn.ready { background: #2c8a2a; color: #fff; }
 
 /* tabs keep one weight; only the colour marks the selected one */
 .tab, .tab.active { font-weight: 600; }
+
+/* add-repository button: a clear outlined plus */
+.tab.add { padding: 0 10px; align-items: center; color: var(--bright); background: none !important; }
+.tab.add .ico { color: var(--bright); width: 24px; height: 24px; border-radius: 5px; border: 1px solid var(--line2); background: color-mix(in srgb, var(--bg2) 70%, transparent); display: inline-flex; align-items: center; justify-content: center; }
+.tab.add .ico svg { width: 15px; height: 15px; stroke-width: 1.8; }
+.tab.add:hover .ico { border-color: var(--accent); color: #fff; background: color-mix(in srgb, var(--accent) 30%, transparent); }
+
+/* update button when a new version is waiting */
+.iconbtn.has-update { color: #fff; background: var(--green); border-radius: 12px; padding: 3px 10px 3px 7px; gap: 5px; display: inline-flex; align-items: center; align-self: center; font-size: calc(12.5px + var(--fz)); font-weight: 600; }
+.iconbtn.has-update:hover { filter: brightness(1.12); background: var(--green); }
+.iconbtn.has-update .updot { display: none; }
