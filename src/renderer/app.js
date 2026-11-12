@@ -1320,7 +1320,7 @@ function buildRow(r, i) {
   let groups = c.wip ? [] : r.refMap.get(c.sha) || [];
   // Smart branch visibility: keep local branches, HEAD and tags; hide remote-only branch labels.
   if (S.settings.smart) groups = groups.filter((g) => g.local || g.tag || g.head);
-  const isSel = r.selected === c.sha || r.multi.has(c.sha);
+  const isSel = !r.hideRight && (r.selected === c.sha || r.multi.has(c.sha));
   const el = h('div', {
     class: 'row' + (isSel ? ' sel' : '') + (c.wip ? ' wip' : '') + (groups[0]?.head ? ' headrow' : '') + (r.search?.set.has(i) ? ' hit' : ''),
     style: { top: i * ROW + 'px', '--lane': laneColor(row.col) },
@@ -1442,10 +1442,18 @@ function renderGraph() {
 function updateSelection() {
   const r = R();
   if (!r) return;
-  for (const el of gv.els.values()) el.classList.toggle('sel', el.dataset.sha === r.selected || r.multi.has(el.dataset.sha));
+  for (const el of gv.els.values()) el.classList.toggle('sel', !r.hideRight && (el.dataset.sha === r.selected || r.multi.has(el.dataset.sha)));
 }
 function clickRow(r, i, e) {
   const sha = r.rows[i].commit.sha;
+  // Clicking the commit that is already selected deselects it and hides the right panel.
+  const plain = e.type === 'click' && !e.shiftKey && !e.metaKey;
+  if (plain && !r.hideRight && !r.multi.size && r.selected === sha) {
+    r.hideRight = true;
+    updateSelection();
+    return renderRight();
+  }
+  r.hideRight = false;
   if (e.shiftKey && r.anchor != null && sha !== 'WIP') {
     const [a, b] = [Math.min(r.anchor, i), Math.max(r.anchor, i)];
     r.multi = new Set(r.rows.slice(a, b + 1).filter((x) => !x.commit.wip && !x.commit.stash).map((x) => x.commit.sha));
@@ -1693,6 +1701,8 @@ function renderRight() {
   const r = R();
   const box = $('right');
   if (!r || !r.data) return put(box, );
+  box.style.display = r.hideRight ? 'none' : '';
+  if (r.hideRight) return;
   const d = r.data;
   const sel = r.selected;
   const range = r.multi.size > 1 ? multiRange(r) : null;
