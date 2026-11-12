@@ -597,3 +597,5 @@ html[data-theme=light] .row.sel .mcell, html[data-theme=light] .row.sel:hover .m
 .row.sel .band { opacity: .55; }
 .row.headrow .gline { top: 13px; }                          /* current branch's line meets its label without a step */
 .row.sel .band { opacity: 1; background: color-mix(in srgb, var(--lane) 52%, var(--bg0)); }   /* one tone across the selected row */
+/* selected tab keeps the same height and position as the others */
+.tab.active { margin-top: 0; border-radius: 0; }
