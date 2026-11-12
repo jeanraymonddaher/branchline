@@ -470,3 +470,14 @@ html[data-theme=light] .band { opacity: .16; }
 .tab .tclose { display: inline-flex; visibility: hidden; margin-left: 2px; }
 .tab.active .tclose, .tab:hover .tclose { visibility: visible; }
 .tab.add { flex: none; min-width: 0; padding: 0 14px; }
+
+/* multi-select: list of the selected commits */
+.cdmhead { padding: 4px 12px 8px; font-size: calc(16px + var(--fz)); color: var(--bright); }
+.cdlist { margin: 0 10px 8px; max-height: 190px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; flex: none; }
+.cdcard { display: flex; align-items: center; gap: 9px; padding: 6px 8px; background: var(--bg2); border: 1px solid var(--line); border-radius: 3px; }
+.cdcard:hover { background: var(--bg3); }
+.cdcard .node { position: relative; top: 0; width: 30px; height: 30px; border: none; border-radius: 3px; font-size: 11px; flex: none; }
+.cdcard .cw { flex: 1; min-width: 0; }
+.cdcard .cs { color: var(--bright); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cdcard .cm { color: var(--dim); font-size: calc(12px + var(--fz)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cdcard .ch { font: 600 calc(13px + var(--fz)) var(--mono); color: var(--bright); flex: none; align-self: flex-start; }

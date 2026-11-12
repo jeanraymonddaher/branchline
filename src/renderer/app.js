@@ -1854,16 +1854,24 @@ function renderRight() {
     const fs = files || [];
     put(box, 
       h('div', { class: 'cdhead' }, `${shas.length} commits selected`),
-      range
-        ? h(
-            'div',
-            { class: 'cdrange' },
-            'Showing all changes from ',
-            h('a', { title: range.oldest.subject, onclick: () => selectSha(range.oldest.sha, true) }, short(range.oldest.sha)),
-            ' to ',
-            h('a', { title: range.newest.subject, onclick: () => selectSha(range.newest.sha, true) }, short(range.newest.sha))
+      h('div', { class: 'cdmhead' }, `Viewing all changes in ${shas.length} commits`),
+      h(
+        'div',
+        { class: 'cdlist' },
+        shas
+          .map((x) => r.bySha.get(x))
+          .filter(Boolean)
+          .sort((x, y) => r.index.get(x.sha) - r.index.get(y.sha))
+          .map((c) =>
+            h(
+              'div',
+              { class: 'cdcard', title: 'Click to select only this commit', onclick: () => selectSha(c.sha, true) },
+              avatarNode(c, 'node'),
+              h('div', { class: 'cw' }, h('div', { class: 'cs' }, c.subject), h('div', { class: 'cm' }, `${fmtDate(c.at)} by ${c.author}`)),
+              h('span', { class: 'ch' }, short(c.sha))
+            )
           )
-        : null,
+      ),
       h(
         'div',
         { class: 'cdmulti' },
