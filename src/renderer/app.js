@@ -1029,7 +1029,7 @@ function renderLeft() {
     renderLeft();
     renderGraph();
   };
-  put($('viewing'), icon('commit', 14), h('span', {}, 'Viewing ', h('b', {}, String(d.commits.length))), h('span', { style: { flex: '1' } }), h('button', { class: 'iconbtn lcollapse', title: 'Collapse the left panel', onclick: () => setCollapsed(true) }, icon('chevLeft', 13)));
+  put($('viewing'), h('button', { class: 'railexp', title: 'Collapse the left panel', onclick: () => setCollapsed(true) }, icon('chevLeft', 12)), h('span', {}, 'Viewing ', h('b', {}, String(d.commits.length))));
   $('left').classList.toggle('collapsed', !!S.settings.leftCollapsed);
   const railItem = (key, ico, n, label) => h('div', { class: 'railitem', title: `${n} ${label}`, onclick: () => setCollapsed(false, key) }, icon(ico, 20), h('span', {}, String(n)));
   put($('lrail'),
