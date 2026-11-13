@@ -756,3 +756,11 @@ html[data-theme=light] .commitbtn.ready { background: #2c8a2a; color: #fff; }
 
 /* open-on-remote button in the toolbar */
 .tright { display: flex; align-items: center; gap: 6px; }
+
+/* selected row, measured from GitKraken: same slim height as other rows, lane tint in the graph, indigo across the message */
+:root { --selrow: color-mix(in srgb, #5b55ff 22%, var(--bg0)); }
+.row.sel .band { top: 3px; bottom: 3px; opacity: 1; background: color-mix(in srgb, var(--lane) 38%, var(--bg0)); }
+.row.sel .mcell::before { top: 3px; bottom: 3px; }
+.row.sel .mcell, .row.sel:hover .mcell, .row.sel .acell, .row.sel .dcell, .row.sel .scell { background: linear-gradient(var(--selrow), var(--selrow)) center / 100% calc(100% - 6px) no-repeat; }
+html[data-theme=light] { --selrow: color-mix(in srgb, #3d5bff 18%, var(--bg0)); }
+html[data-theme=light] .row.sel .mcell, html[data-theme=light] .row.sel:hover .mcell, html[data-theme=light] .row.sel .acell, html[data-theme=light] .row.sel .dcell, html[data-theme=light] .row.sel .scell { background: linear-gradient(var(--selrow), var(--selrow)) center / 100% calc(100% - 6px) no-repeat; }
